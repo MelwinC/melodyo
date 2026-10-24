@@ -1,0 +1,23 @@
+services:
+  app:
+    build: .
+    restart: always
+    environment:
+      REDIRECT_URI: https://melodyo.melwinchenu.fr/callback
+    networks:
+      - traefik-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-network"
+      - "traefik.http.routers.melodyo-secure.entrypoints=https"
+      - "traefik.http.routers.melodyo-secure.rule=Host(`melodyo.melwinchenu.fr`)"
+      - "traefik.http.routers.melodyo-secure.tls=true"
+      - "traefik.http.routers.melodyo-secure.tls.certresolver=cloudflare"
+      - "traefik.http.routers.melodyo-secure.tls.domains[0].main=melwinchenu.fr"
+      - "traefik.http.routers.melodyo-secure.tls.domains[0].sans=*.melwinchenu.fr"
+      - "traefik.http.routers.melodyo-secure.service=melodyo"
+      - "traefik.http.services.melodyo.loadbalancer.server.port=8888"
+
+networks:
+  traefik-network:
+    external: true

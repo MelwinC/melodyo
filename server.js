@@ -2,16 +2,20 @@ const express = require('express');
 const axios = require('axios');
 const crypto = require('crypto');
 const path = require('path');
+const http = require('http');
 
 const app = express();
-const PORT = 8888;
+const PORT = Number(process.env.PORT) || 8888;
+const HOST = process.env.HOST || '127.0.0.1';
 const CLIENT_ID = '6cb984ffc4a14b71b43b70790e82a40d';
-const REDIRECT_URI = 'http://127.0.0.1:8888/callback';
+const REDIRECT_URI = process.env.REDIRECT_URI || `http://127.0.0.1:${PORT}/callback`;
+const PROD = process.argv.includes('--prod');
+const CLIENT_DIR = path.join(__dirname, 'client');
+const DIST_DIR = path.join(__dirname, 'dist');
 
 const pendingAuth = new Map();
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/login', (req, res) => {
   const verifier = crypto.randomBytes(32).toString('base64url');
@@ -132,6 +136,27 @@ app.post('/refresh', async (req, res) => {
   }
 });
 
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`\n  Blind Test — http://127.0.0.1:${PORT}\n`);
-});
+async function start() {
+  const server = http.createServer(app);
+
+  if (PROD) {
+    app.use(express.static(DIST_DIR));
+    app.get('*', (req, res) => res.sendFile(path.join(DIST_DIR, 'index.html')));
+  } else {
+    // Dev : Vite en middleware sur le même port (hot reload), l'URL de callback Spotify reste inchangée
+    const { createServer } = await import('vite');
+    const vite = await createServer({
+      root: CLIENT_DIR,
+      configFile: path.join(CLIENT_DIR, 'vite.config.mjs'),
+      server: { middlewareMode: true, hmr: { server } },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  }
+
+  server.listen(PORT, HOST, () => {
+    console.log(`\n  Melodyo${PROD ? '' : ' (dev, hot reload)'} — http://${HOST}:${PORT}\n`);
+  });
+}
+
+start();

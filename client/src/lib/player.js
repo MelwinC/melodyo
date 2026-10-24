@@ -1,0 +1,156 @@
+import { api, ensureToken, getToken } from './spotify.js';
+import { toast } from './toast.js';
+
+let player = null;
+let deviceId = null;
+let initPromise = null;
+let playbackErrorCount = 0;
+let queue = [];
+
+/* ── STORE (lu par les composants via useSyncExternalStore) ── */
+let snapshot = { paused: true, position: 0, duration: 0, sdkTrack: null, index: 0, total: 0, theme: null };
+const listeners = new Set();
+
+function update(patch) {
+  snapshot = { ...snapshot, ...patch };
+  listeners.forEach(fn => fn());
+}
+
+export const subscribePlayer = fn => { listeners.add(fn); return () => listeners.delete(fn); };
+export const getPlayerSnapshot = () => snapshot;
+
+/* ── INIT (lancé dès l'écran de création) ── */
+export function ensurePlayer() {
+  if (player) return Promise.resolve(player);
+  if (!initPromise) {
+    console.log('[player] démarrage initPlayer…');
+    initPromise = initPlayer().catch(err => {
+      console.error('[player] initPlayer échoué :', err.message);
+      initPromise = null;
+      throw err;
+    });
+  }
+  return initPromise;
+}
+
+async function initPlayer() {
+  await window.spotifySdkReady;
+  await ensureToken();
+
+  return new Promise((resolve, reject) => {
+    const p = new window.Spotify.Player({
+      name: 'Melodyo',
+      getOAuthToken: async cb => {
+        try {
+          await ensureToken();
+          cb(getToken());
+        } catch (e) {
+          console.error('[player] renouvellement du token échoué :', e.message);
+          toast(e.message);
+        }
+      },
+      volume: 0.8,
+    });
+
+    const timeout = setTimeout(() => {
+      reject(new Error('Délai dépassé — impossible de se connecter au lecteur Spotify.'));
+    }, 20000);
+
+    p.addListener('ready', ({ device_id }) => {
+      clearTimeout(timeout);
+      console.log('[player] ready! device_id:', device_id);
+      deviceId = device_id;
+      player = p;
+      resolve(p);
+    });
+    p.addListener('player_state_changed', onPlayerStateChanged);
+    p.addListener('initialization_error', e => { clearTimeout(timeout); console.error('[player] initialization_error:', e.message); reject(new Error(e.message)); });
+    p.addListener('authentication_error', e => { clearTimeout(timeout); console.error('[player] authentication_error:', e.message); reject(new Error('Erreur d\'authentification Spotify')); });
+    p.addListener('account_error', e => { clearTimeout(timeout); console.error('[player] account_error:', e.message); reject(new Error('Spotify Premium requis pour la lecture dans le navigateur')); });
+    p.addListener('not_ready', ({ device_id }) => console.warn('[player] not_ready, device_id:', device_id));
+    p.addListener('playback_error', e => {
+      console.error('[player] playback_error:', e.message);
+      // Erreurs en rafale = le navigateur ne peut pas déchiffrer l'audio (DRM Widevine) :
+      // on met en pause au lieu de laisser le SDK sauter toute la playlist
+      if (++playbackErrorCount >= 2) {
+        p.pause().catch(() => {});
+        toast('⚠️ Ce navigateur ne peut pas lire l\'audio Spotify (DRM). Essaie Chrome ou Edge.');
+      } else {
+        toast(`⚠️ Lecture impossible : ${e.message}`);
+      }
+    });
+    p.addListener('autoplay_failed', () => {
+      console.warn('[player] autoplay bloqué par le navigateur');
+      toast('Lecture bloquée par le navigateur — appuie sur ▶');
+    });
+    p.connect();
+  });
+}
+
+// Firefox reçoit un 403 sur la licence Widevine de Spotify : aucun son n'est lisible
+export const isFirefox = /firefox|fxios/i.test(navigator.userAgent);
+
+/* ── LECTURE ── */
+export async function startQueue(tracks) {
+  queue = tracks;
+  update({ index: 0, total: tracks.length, sdkTrack: null, theme: null, position: 0, duration: 0 });
+
+  console.log(`[transfer] transfert vers device ${deviceId}…`);
+  await api('PUT', '/me/player', { device_ids: [deviceId], play: false });
+  await new Promise(r => setTimeout(r, 600));
+  console.log(`[transfer] lancement de ${tracks.length} URIs…`);
+  await api('PUT', `/me/player/play?device_id=${deviceId}`, {
+    uris: tracks.map(t => t.uri),
+    offset: { position: 0 },
+  });
+}
+
+// Spotify peut remplacer un titre par une version équivalente (relinking) : on compare aussi linked_from
+function trackUris(track) {
+  return [track.uri, track.linked_from?.uri].filter(Boolean);
+}
+
+function onPlayerStateChanged(state) {
+  if (!state) return;
+  if (!state.paused && state.position > 0) playbackErrorCount = 0;
+
+  const sdkTrack = state.track_window?.current_track || null;
+  const patch = { paused: state.paused, position: state.position, duration: state.duration, sdkTrack };
+
+  if (sdkTrack && sdkTrack.uri !== snapshot.sdkTrack?.uri) {
+    const uris = trackUris(sdkTrack);
+    const idx = queue.findIndex(t => trackUris(t).some(u => uris.includes(u)));
+    if (idx >= 0) patch.index = idx;
+    patch.theme = idx >= 0 ? { id: queue[idx]._themeId, label: queue[idx]._themeLabel } : null;
+  }
+  update(patch);
+}
+
+export async function pollPosition() {
+  const state = await player?.getCurrentState();
+  if (state) update({ position: state.position, duration: state.duration });
+}
+
+// Doit être appelé de façon synchrone dans un clic, sinon le navigateur peut bloquer l'audio
+export const activate = () => player?.activateElement?.();
+
+export async function togglePlay() {
+  if (!player) return;
+  activate();
+  await player.togglePlay();
+}
+
+export const nextTrack = () => player?.nextTrack();
+export const previousTrack = () => player?.previousTrack();
+export const pause = () => player?.pause().catch(() => {});
+export const disconnect = () => player?.disconnect();
+export const seek = ms => player?.seek(Math.floor(ms));
+
+export async function seekBy(deltaMs) {
+  const state = await player?.getCurrentState();
+  if (!state) return;
+  await player.seek(Math.max(0, Math.min(state.position + deltaMs, state.duration - 1000)));
+}
+
+// Module à état (lecteur SDK) : on recharge la page pour éviter un lecteur fantôme au hot reload
+if (import.meta.hot) import.meta.hot.accept(() => location.reload());
