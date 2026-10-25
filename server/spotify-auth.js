@@ -1,4 +1,4 @@
-import { deleteLink, getLink, saveLink } from './spotify-links.js';
+import { deleteLink, getLink, saveLink, UnreadableLinkError } from './spotify-links.js';
 
 export class SpotifyNotLinkedError extends Error {}
 export class SpotifyRelinkRequiredError extends Error {}
@@ -17,18 +17,30 @@ export function spotifyTokenRequest(params, timeoutMs) {
 // Un seul renouvellement à la fois par compte : Spotify change le refresh token à chaque fois
 const inflight = new Map();
 
-export function getAccessToken(pool, config, userId, { timeoutMs = 10_000 } = {}) {
-  if (!inflight.has(userId)) {
-    inflight.set(userId, loadToken(pool, config, userId, timeoutMs).finally(() => inflight.delete(userId)));
+// forceRefresh : Spotify a refusé le token avant son expiration (accès révoqué, token invalidé)
+export function getAccessToken(pool, config, userId, { timeoutMs = 10_000, forceRefresh = false } = {}) {
+  const key = `${userId}:${forceRefresh}`;
+  if (!inflight.has(key)) {
+    inflight.set(key, loadToken(pool, config, userId, timeoutMs, forceRefresh).finally(() => inflight.delete(key)));
   }
-  return inflight.get(userId);
+  return inflight.get(key);
 }
 
-async function loadToken(pool, config, userId, timeoutMs) {
+async function readLink(pool, config, userId) {
+  try {
+    return await getLink(pool, config.tokenKey, userId);
+  } catch (err) {
+    if (!(err instanceof UnreadableLinkError)) throw err;
+    await deleteLink(pool, userId);
+    throw new SpotifyRelinkRequiredError();
+  }
+}
+
+async function loadToken(pool, config, userId, timeoutMs, forceRefresh) {
   const now = new Date();
-  const link = await getLink(pool, config.tokenKey, userId);
+  const link = await readLink(pool, config, userId);
   if (!link) throw new SpotifyNotLinkedError();
-  if (link.expiresAt > now) return { accessToken: link.accessToken, expiresAt: link.expiresAt };
+  if (!forceRefresh && link.expiresAt > now) return { accessToken: link.accessToken, expiresAt: link.expiresAt };
   return refresh(pool, config, userId, link, now, timeoutMs);
 }
 

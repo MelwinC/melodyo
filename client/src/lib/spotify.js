@@ -1,3 +1,4 @@
+import { isSessionExpired, notifyUnauthorized } from './http.js';
 import { reloadOnHotUpdate } from './hot.js';
 import { markSpotifyUnlinked } from './session.js';
 
@@ -5,6 +6,11 @@ import { markSpotifyUnlinked } from './session.js';
 let token = null;
 let expiresAt = 0;
 let pending = null;
+
+const expiredError = () => {
+  notifyUnauthorized();
+  return new Error('Session expirée, reconnecte-toi');
+};
 
 const relinkError = () => {
   markSpotifyUnlinked();
@@ -14,6 +20,7 @@ const relinkError = () => {
 async function fetchToken() {
   const res = await fetch('/api/spotify/token');
   const json = await res.json();
+  if (isSessionExpired(res.status, json)) throw expiredError();
   if (res.status === 409) throw relinkError();
   if (!res.ok) throw new Error('Spotify injoignable, réessaie');
   token = json.accessToken;
@@ -37,6 +44,7 @@ export async function api(method, path, body) {
   });
   if (res.status === 204) return null;
   const json = await res.json();
+  if (isSessionExpired(res.status, json)) throw expiredError();
   if (res.status === 409) throw relinkError();
   if (!res.ok) throw new Error(json.error?.message || `Erreur Spotify ${res.status}`);
   return json;

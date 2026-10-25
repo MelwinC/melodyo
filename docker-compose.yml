@@ -20,8 +20,8 @@ services:
     env_file: .env
     environment:
       REDIRECT_URI: https://melodyo.melwinchenu.fr/callback
-      # Cloudflare puis Traefik devant l'app : l'IP du joueur est 2 sauts plus loin
-      TRUST_PROXY: 2
+      # Traefik ne relaie pas l'IP fournie par Cloudflare : on lit l'en-tête dédié de Cloudflare
+      CLIENT_IP_HEADER: cf-connecting-ip
     volumes:
       - avatars:/app/data/avatars
     depends_on:

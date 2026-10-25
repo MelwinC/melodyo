@@ -82,3 +82,17 @@ describe('api', () => {
     await expect(spotify.api('GET', '/x')).rejects.toThrow('Erreur Spotify 502');
   });
 });
+
+describe('session expirée', () => {
+  it.each([
+    ['ensureToken', () => spotify.ensureToken()],
+    ['api', () => spotify.api('GET', '/me')],
+  ])('%s signale la fin de session', async (_, call) => {
+    const http = await import('./http.js');
+    const handler = vi.fn();
+    http.onUnauthorized(handler);
+    fetch.mockResolvedValue(response(401, { error: 'not_logged_in' }));
+    await expect(call()).rejects.toThrow('Session expirée, reconnecte-toi');
+    expect(handler).toHaveBeenCalledOnce();
+  });
+});

@@ -102,3 +102,31 @@ describe('ALL /spotify/*', () => {
     expect(res.status).toBe(502);
   });
 });
+
+describe('token refusé par Spotify avant son expiration', () => {
+  const json = (status, body) => ({ ok: status < 400, status, json: async () => body, text: async () => JSON.stringify(body) });
+
+  it('renouvelle le token et rejoue l\'appel une fois', async () => {
+    fetch
+      .mockResolvedValueOnce(json(401, { error: { status: 401, message: 'Invalid access token' } }))
+      .mockResolvedValueOnce(json(200, { access_token: 'neuf', expires_in: 3600 }))
+      .mockResolvedValueOnce(json(200, { id: 'u1' }));
+    const res = await (await linked()).get('/spotify/me');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ id: 'u1' });
+    expect(fetch.mock.calls[1][0]).toBe('https://accounts.spotify.com/api/token');
+    expect(fetch.mock.calls[2][1].headers.Authorization).toBe('Bearer neuf');
+  });
+
+  it('demande de relier Spotify si l\'accès a été révoqué', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    fetch
+      .mockResolvedValueOnce(json(401, { error: { status: 401, message: 'Invalid access token' } }))
+      .mockResolvedValueOnce(json(400, { error: 'invalid_grant' }));
+    const agent = await linked();
+    const res = await agent.get('/spotify/me');
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ error: 'spotify_relink_required' });
+    expect((await agent.get('/api/me')).body.user.spotifyLinked).toBe(false);
+  });
+});

@@ -82,3 +82,27 @@ describe('getAccessToken', () => {
     await expect(getAccessToken(pool, config, user.id)).rejects.toBeInstanceOf(SpotifyNotLinkedError);
   });
 });
+
+describe('liaison illisible', () => {
+  it('est supprimée et demande de relier Spotify si la clé a changé', async () => {
+    const user = await insertUser(pool);
+    await linkSpotify(pool, user.id);
+    const otherKey = { ...config, tokenKey: 'd'.repeat(64) };
+    await expect(getAccessToken(pool, otherKey, user.id)).rejects.toBeInstanceOf(SpotifyRelinkRequiredError);
+    expect(await getLink(pool, config.tokenKey, user.id)).toBeNull();
+  });
+
+  it('relaie une panne de base sans toucher à la liaison', async () => {
+    const broken = { query: () => Promise.reject(new Error('down')) };
+    await expect(getAccessToken(broken, config, 'x')).rejects.toThrow('down');
+  });
+});
+
+describe('renouvellement forcé', () => {
+  it('ignore un token encore valide', async () => {
+    const user = await insertUser(pool);
+    await linkSpotify(pool, user.id);
+    fetch.mockResolvedValue(json(200, { access_token: 'force', expires_in: 3600 }));
+    expect((await getAccessToken(pool, config, user.id, { forceRefresh: true })).accessToken).toBe('force');
+  });
+});

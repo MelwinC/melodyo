@@ -1,5 +1,7 @@
 import { decrypt, encrypt } from './crypto.js';
 
+export class UnreadableLinkError extends Error {}
+
 // Marge d'une minute : un token renvoyé au SDK reste valable le temps de l'utiliser
 const EXPIRY_MARGIN_S = 60;
 
@@ -17,12 +19,17 @@ export async function saveLink(pool, key, userId, { spotifyUserId, accessToken, 
 export async function getLink(pool, key, userId) {
   const { rows } = await pool.query('SELECT * FROM spotify_links WHERE user_id = $1', [userId]);
   if (!rows[0]) return null;
-  return {
-    spotifyUserId: rows[0].spotify_user_id,
-    accessToken: decrypt(rows[0].access_token, key),
-    refreshToken: decrypt(rows[0].refresh_token, key),
-    expiresAt: rows[0].expires_at,
-  };
+  try {
+    return {
+      spotifyUserId: rows[0].spotify_user_id,
+      accessToken: decrypt(rows[0].access_token, key),
+      refreshToken: decrypt(rows[0].refresh_token, key),
+      expiresAt: rows[0].expires_at,
+    };
+  } catch (err) {
+    // Clé de chiffrement changée ou perdue : la liaison ne peut plus servir
+    throw new UnreadableLinkError(err.message, { cause: err });
+  }
 }
 
 export async function deleteLink(pool, userId) {

@@ -1,4 +1,4 @@
-import { request, uploadImage } from './http.js';
+import { onUnauthorized, request, uploadImage } from './http.js';
 import { reloadOnHotUpdate } from './hot.js';
 import { resizeForAvatar } from './image.js';
 import { toast } from './toast.js';
@@ -14,10 +14,16 @@ function set(next) {
 
 const ready = user => set({ status: 'ready', user });
 
+onUnauthorized(() => set({ status: 'anonymous', user: null }));
+
 export const subscribeSession = fn => { listeners.add(fn); return () => listeners.delete(fn); };
 export const getSession = () => snapshot;
 
+// Les versions précédentes gardaient les tokens Spotify dans le navigateur : on les efface
+const LEGACY_KEYS = ['bt_token', 'bt_refresh', 'bt_expiry'];
+
 export async function loadSession() {
+  LEGACY_KEYS.forEach(key => localStorage.removeItem(key));
   try {
     ready((await request('GET', '/api/me')).user);
   } catch (err) {

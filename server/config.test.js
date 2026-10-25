@@ -15,6 +15,7 @@ describe('loadConfig', () => {
       tokenKey: '0'.repeat(64),
       trustProxy: 0,
       spotifyTimeoutMs: 10_000,
+      clientIpHeader: null,
     });
   });
 
@@ -22,12 +23,12 @@ describe('loadConfig', () => {
     const env = {
       PORT: '9000', HOST: '0.0.0.0', SPOTIFY_CLIENT_ID: 'cid',
       REDIRECT_URI: 'https://x/callback', DATABASE_URL: 'postgres://db/x',
-      AVATAR_DIR: '/data/avatars', TOKEN_ENCRYPTION_KEY: 'ab'.repeat(32), TRUST_PROXY: '2',
+      AVATAR_DIR: '/data/avatars', TOKEN_ENCRYPTION_KEY: 'ab'.repeat(32), TRUST_PROXY: '2', CLIENT_IP_HEADER: 'cf-connecting-ip',
     };
     expect(loadConfig(env, ['--prod'])).toEqual({
       prod: true, host: '0.0.0.0', port: 9000, spotifyClientId: 'cid',
       redirectUri: 'https://x/callback', databaseUrl: 'postgres://db/x',
-      avatarDir: '/data/avatars', tokenKey: 'ab'.repeat(32), trustProxy: 2, spotifyTimeoutMs: 10_000,
+      avatarDir: '/data/avatars', tokenKey: 'ab'.repeat(32), trustProxy: 2, spotifyTimeoutMs: 10_000, clientIpHeader: 'cf-connecting-ip',
     });
   });
 

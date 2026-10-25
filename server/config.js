@@ -28,5 +28,6 @@ export function loadConfig(env = process.env, argv = process.argv) {
     tokenKey: key,
     trustProxy: Number(env.TRUST_PROXY) || 0,
     spotifyTimeoutMs: 10_000,
+    clientIpHeader: env.CLIENT_IP_HEADER || null,
   };
 }

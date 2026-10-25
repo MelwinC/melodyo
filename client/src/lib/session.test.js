@@ -109,3 +109,23 @@ describe('messageFor', () => {
     expect(session.messageFor(code)).toBe(message);
   });
 });
+
+describe('session terminée pendant l\'usage', () => {
+  it('repasse en anonyme quand le serveur répond 401 not_logged_in', async () => {
+    http.request.mockResolvedValue({ user });
+    await session.loadSession();
+    http.notifyUnauthorized();
+    expect(session.getSession()).toEqual({ status: 'anonymous', user: null });
+  });
+});
+
+describe('anciens tokens de l\'étape 1', () => {
+  it('sont effacés du navigateur au chargement', async () => {
+    for (const k of ['bt_token', 'bt_refresh', 'bt_expiry']) localStorage.setItem(k, 'x');
+    localStorage.setItem('autre', 'garde');
+    http.request.mockResolvedValue({ user });
+    await session.loadSession();
+    expect(Object.keys(localStorage)).toEqual(['autre']);
+    localStorage.clear();
+  });
+});

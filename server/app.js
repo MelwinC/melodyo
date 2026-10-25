@@ -18,7 +18,7 @@ export function createApp({ config, pool, limits }) {
   app.use('/spotify', express.json({ limit: '100kb' }));
   app.use('/api', express.json({ limit: '10kb' }));
   app.use(loadSession(pool));
-  app.use(accountsRouter({ pool, config, limiters: createLimiters(limits) }));
+  app.use(accountsRouter({ pool, config, limiters: createLimiters(limits, { clientIpHeader: config.clientIpHeader }) }));
   app.use(avatarsRouter({ pool, config }));
   app.use(spotifyAuthRouter({ pool, config }));
   app.use(spotifyProxyRouter({ pool, config }));

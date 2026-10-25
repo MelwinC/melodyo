@@ -27,14 +27,24 @@ export function spotifyProxyRouter({ pool, config }) {
 
     const spotifyPath = req.originalUrl.replace(/^\/spotify/, '');
     const hasBody = ['POST', 'PUT', 'PATCH'].includes(req.method);
+    const callSpotify = token => fetch(`https://api.spotify.com/v1${spotifyPath}`, {
+      method: req.method,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: hasBody ? JSON.stringify(req.body) : undefined,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
 
     try {
-      const response = await fetch(`https://api.spotify.com/v1${spotifyPath}`, {
-        method: req.method,
-        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: hasBody ? JSON.stringify(req.body) : undefined,
-        signal: AbortSignal.timeout(timeoutMs),
-      });
+      let response = await callSpotify(accessToken);
+      // Token refusé avant son expiration : un renouvellement forcé, puis un seul nouvel essai
+      if (response.status === 401) {
+        try {
+          ({ accessToken } = await getAccessToken(pool, config, req.user.id, { timeoutMs, forceRefresh: true }));
+        } catch (err) {
+          return sendTokenError(res, err);
+        }
+        response = await callSpotify(accessToken);
+      }
       const text = await response.text();
 
       console.log(`[Spotify] ${req.method} ${spotifyPath.split('?')[0]} → ${response.status}`);

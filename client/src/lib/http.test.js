@@ -47,3 +47,25 @@ describe('uploadImage', () => {
     expect(fetch.mock.calls[0][1]).toEqual({ method: 'POST', headers: { 'Content-Type': 'image/webp' }, body: file });
   });
 });
+
+describe('session expirée', () => {
+  it('prévient le gestionnaire sur un 401 not_logged_in', async () => {
+    const { onUnauthorized } = await import('./http.js');
+    const handler = vi.fn();
+    onUnauthorized(handler);
+    fetch.mockResolvedValue(response(401, { error: 'not_logged_in' }));
+    await expect(request('GET', '/api/me')).rejects.toMatchObject({ status: 401 });
+    expect(handler).toHaveBeenCalledOnce();
+    fetch.mockResolvedValue(response(401, { error: 'invalid_credentials' }));
+    await expect(request('POST', '/api/auth/login', {})).rejects.toMatchObject({ code: 'invalid_credentials' });
+    expect(handler).toHaveBeenCalledOnce();
+  });
+});
+
+describe('sans gestionnaire de session', () => {
+  it('un 401 ne plante pas', async () => {
+    vi.resetModules();
+    const fresh = await import('./http.js');
+    expect(() => fresh.notifyUnauthorized()).not.toThrow();
+  });
+});

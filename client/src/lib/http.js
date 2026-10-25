@@ -6,9 +6,16 @@ export class ApiError extends Error {
   }
 }
 
+// Session terminée ailleurs (autre onglet, expiration) : le store de session repasse en anonyme
+let unauthorizedHandler = () => {};
+export const onUnauthorized = fn => { unauthorizedHandler = fn; };
+export const notifyUnauthorized = () => unauthorizedHandler();
+export const isSessionExpired = (status, json) => status === 401 && json?.error === 'not_logged_in';
+
 async function parse(res) {
   if (res.status === 204) return null;
   const json = await res.json().catch(() => ({}));
+  if (isSessionExpired(res.status, json)) notifyUnauthorized();
   if (!res.ok) throw new ApiError(res.status, json.error ?? `http_${res.status}`);
   return json;
 }

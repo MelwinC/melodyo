@@ -162,4 +162,20 @@ describe('limites de tentatives', () => {
     for (let i = 0; i < 2; i++) await register(request(limited), { username: uniqueName(), password: 'motdepasse' });
     expect((await register(request(limited), { username: uniqueName(), password: 'motdepasse' })).status).toBe(429);
   });
+
+  it('compte les tentatives par joueur derrière Cloudflare (CF-Connecting-IP)', async () => {
+    const limited = createTestApp(pool, {
+      clientIpHeader: 'cf-connecting-ip',
+      limits: { loginPerIp: tiny, loginPerUser: { windowMs: 60_000, limit: 100 }, registerPerIp: tiny },
+    });
+    const attempt = ip => {
+      const req = request(limited).post('/api/auth/login');
+      if (ip) req.set('CF-Connecting-IP', ip);
+      return req.send({ username: uniqueName(), password: 'mauvaismdp' });
+    };
+    for (let i = 0; i < 2; i++) await attempt('203.0.113.1');
+    expect((await attempt('203.0.113.1')).status).toBe(429);
+    expect((await attempt('203.0.113.2')).status).toBe(401);
+    expect((await attempt()).status).toBe(401);
+  });
 });
