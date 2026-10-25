@@ -24,7 +24,7 @@ const toTrack = row => ({
 });
 
 // Une nouvelle partie interrompt celle qui était en cours (onglet fermé sans quitter)
-export async function createGame(pool, hostId, { settings, tracks }) {
+export async function createGame(pool, hostId, { settings, tracks, roomId = null }) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -35,7 +35,10 @@ export async function createGame(pool, hostId, { settings, tracks }) {
        WHERE g.host_id = $1 AND g.status = 'playing'`,
       [hostId],
     );
-    const { rows } = await client.query('INSERT INTO games (host_id, settings) VALUES ($1, $2) RETURNING id', [hostId, settings]);
+    const { rows } = await client.query(
+      'INSERT INTO games (host_id, settings, room_id) VALUES ($1, $2, $3) RETURNING id',
+      [hostId, settings, roomId],
+    );
     const gameId = rows[0].id;
     const values = [];
     const params = [gameId];
