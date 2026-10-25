@@ -42,10 +42,10 @@ jobs:
           # La clé est restreinte côté serveur au script de déploiement : seul le SHA est transmis
           ssh "ubuntu@$HOST" "${{ github.sha }}"
 
-      - name: Vérifie que le site répond
+      - name: Vérifie que le site et la base répondent
         run: |
-          for i in $(seq 1 10); do
-            curl -fsS -o /dev/null https://melodyo.melwinchenu.fr/ && exit 0
+          for i in $(seq 1 20); do
+            curl -fsS https://melodyo.melwinchenu.fr/healthz | grep -q '"ok":true' && exit 0
             sleep 3
           done
           exit 1

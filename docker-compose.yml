@@ -1,10 +1,30 @@
 services:
+  db:
+    image: postgres:17-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: melodyo
+      POSTGRES_USER: melodyo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U melodyo -d melodyo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   app:
     build: .
     restart: always
+    env_file: .env
     environment:
       REDIRECT_URI: https://melodyo.melwinchenu.fr/callback
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
+      - default
       - traefik-network
     labels:
       - "traefik.enable=true"
@@ -18,6 +38,10 @@ services:
       - "traefik.http.routers.melodyo-secure.service=melodyo"
       - "traefik.http.services.melodyo.loadbalancer.server.port=8888"
 
+volumes:
+  pgdata:
+
 networks:
+  default:
   traefik-network:
     external: true
