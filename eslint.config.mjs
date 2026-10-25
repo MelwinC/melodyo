@@ -21,10 +21,6 @@ export default [
   },
   { files: ['client/**/*.jsx'], ...reactHooks.configs.flat.recommended },
   {
-    files: ['server.cjs'],
-    languageOptions: { sourceType: 'commonjs', globals: globals.node },
-  },
-  {
     files: ['server/**/*.js', 'test/**/*.js', 'scripts/**/*.js', '*.mjs', 'client/*.mjs'],
     languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: globals.node },
   },
