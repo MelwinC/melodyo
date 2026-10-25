@@ -83,6 +83,21 @@ describe('ensurePlayer', () => {
     await assertion;
   });
 
+  it('abandonne après 20 secondes si le SDK ne se charge jamais (bloqueur, réseau)', async () => {
+    vi.useFakeTimers();
+    window.spotifySdkReady = new Promise(() => {});
+    const promise = mod.ensurePlayer();
+    const assertion = expect(promise).rejects.toThrow(/Délai dépassé/);
+    await vi.advanceTimersByTimeAsync(20000);
+    await assertion;
+    expect(instances).toHaveLength(0);
+  });
+
+  it('rejette si la session Spotify ne peut pas être renouvelée', async () => {
+    spotify.ensureToken.mockRejectedValue(new Error('Session expirée'));
+    await expect(mod.ensurePlayer()).rejects.toThrow('Session expirée');
+  });
+
   it('fournit le token au SDK', async () => {
     const p = await readyPlayer();
     const cb = vi.fn();

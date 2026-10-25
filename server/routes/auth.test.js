@@ -147,3 +147,19 @@ describe('limite des connexions en attente', () => {
     expect((await request(a).get(`/callback?code=c&state=${states[2]}`)).headers.location).toMatch(/access_token=a/);
   });
 });
+
+describe('délai Spotify sur les tokens', () => {
+  const hang = () => fetch.mockImplementation((url, init) => new Promise((_, reject) => {
+    init.signal?.addEventListener('abort', () => reject(init.signal.reason));
+  }));
+
+  it('abandonne un refresh qui ne répond pas', async () => {
+    hang();
+    const express = (await import('express')).default;
+    const { authRouter } = await import('./auth.js');
+    const a = express().use(express.json()).use(authRouter(config, { timeoutMs: 20 }));
+    const res = await request(a).post('/refresh').send({ refresh_token: 'r' });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'refresh_failed' });
+  });
+});

@@ -34,58 +34,62 @@ export function ensurePlayer() {
   return initPromise;
 }
 
-async function initPlayer() {
-  await window.spotifySdkReady;
-  await ensureToken();
-
+// Le délai court dès le départ : il couvre aussi un SDK jamais chargé (bloqueur de pub, réseau)
+function initPlayer() {
   return new Promise((resolve, reject) => {
-    const p = new window.Spotify.Player({
-      name: 'Melodyo',
-      getOAuthToken: async cb => {
-        try {
-          await ensureToken();
-          cb(getToken());
-        } catch (e) {
-          console.error('[player] renouvellement du token échoué :', e.message);
-          toast(e.message);
-        }
-      },
-      volume: 0.8,
-    });
-
     const timeout = setTimeout(() => {
       reject(new Error('Délai dépassé — impossible de se connecter au lecteur Spotify.'));
     }, 20000);
-
-    p.addListener('ready', ({ device_id }) => {
-      clearTimeout(timeout);
-      console.log('[player] ready! device_id:', device_id);
-      deviceId = device_id;
-      player = p;
-      resolve(p);
-    });
-    p.addListener('player_state_changed', onPlayerStateChanged);
-    p.addListener('initialization_error', e => { clearTimeout(timeout); console.error('[player] initialization_error:', e.message); reject(new Error(e.message)); });
-    p.addListener('authentication_error', e => { clearTimeout(timeout); console.error('[player] authentication_error:', e.message); reject(new Error('Erreur d\'authentification Spotify')); });
-    p.addListener('account_error', e => { clearTimeout(timeout); console.error('[player] account_error:', e.message); reject(new Error('Spotify Premium requis pour la lecture dans le navigateur')); });
-    p.addListener('not_ready', ({ device_id }) => console.warn('[player] not_ready, device_id:', device_id));
-    p.addListener('playback_error', e => {
-      console.error('[player] playback_error:', e.message);
-      // Erreurs en rafale = le navigateur ne peut pas déchiffrer l'audio (DRM Widevine) :
-      // on met en pause au lieu de laisser le SDK sauter toute la playlist
-      if (++playbackErrorCount >= 2) {
-        p.pause().catch(() => {});
-        toast('⚠️ Ce navigateur ne peut pas lire l\'audio Spotify (DRM). Essaie Chrome ou Edge.');
-      } else {
-        toast(`⚠️ Lecture impossible : ${e.message}`);
-      }
-    });
-    p.addListener('autoplay_failed', () => {
-      console.warn('[player] autoplay bloqué par le navigateur');
-      toast('Lecture bloquée par le navigateur — appuie sur ▶');
-    });
-    p.connect();
+    const fail = err => { clearTimeout(timeout); reject(err); };
+    connectPlayer(p => { clearTimeout(timeout); resolve(p); }, fail).catch(fail);
   });
+}
+
+async function connectPlayer(onReady, onError) {
+  await window.spotifySdkReady;
+  await ensureToken();
+
+  const p = new window.Spotify.Player({
+    name: 'Melodyo',
+    getOAuthToken: async cb => {
+      try {
+        await ensureToken();
+        cb(getToken());
+      } catch (e) {
+        console.error('[player] renouvellement du token échoué :', e.message);
+        toast(e.message);
+      }
+    },
+    volume: 0.8,
+  });
+
+  p.addListener('ready', ({ device_id }) => {
+    console.log('[player] ready! device_id:', device_id);
+    deviceId = device_id;
+    player = p;
+    onReady(p);
+  });
+  p.addListener('player_state_changed', onPlayerStateChanged);
+  p.addListener('initialization_error', e => { console.error('[player] initialization_error:', e.message); onError(new Error(e.message)); });
+  p.addListener('authentication_error', e => { console.error('[player] authentication_error:', e.message); onError(new Error('Erreur d\'authentification Spotify')); });
+  p.addListener('account_error', e => { console.error('[player] account_error:', e.message); onError(new Error('Spotify Premium requis pour la lecture dans le navigateur')); });
+  p.addListener('not_ready', ({ device_id }) => console.warn('[player] not_ready, device_id:', device_id));
+  p.addListener('playback_error', e => {
+    console.error('[player] playback_error:', e.message);
+    // Erreurs en rafale = le navigateur ne peut pas déchiffrer l'audio (DRM Widevine) :
+    // on met en pause au lieu de laisser le SDK sauter toute la playlist
+    if (++playbackErrorCount >= 2) {
+      p.pause().catch(() => {});
+      toast('⚠️ Ce navigateur ne peut pas lire l\'audio Spotify (DRM). Essaie Chrome ou Edge.');
+    } else {
+      toast(`⚠️ Lecture impossible : ${e.message}`);
+    }
+  });
+  p.addListener('autoplay_failed', () => {
+    console.warn('[player] autoplay bloqué par le navigateur');
+    toast('Lecture bloquée par le navigateur — appuie sur ▶');
+  });
+  p.connect();
 }
 
 // Firefox reçoit un 403 sur la licence Widevine de Spotify : aucun son n'est lisible

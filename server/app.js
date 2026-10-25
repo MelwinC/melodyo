@@ -8,8 +8,10 @@ export function createApp({ config, pool }) {
   const app = express();
   app.disable('x-powered-by');
   app.use(securityHeaders(config.prod));
-  app.use(express.json({ limit: '10kb' }));
   app.use(healthRouter(pool));
+  // /refresh n'attend qu'un token ; le proxy relaie jusqu'à 500 URIs au lancement d'une partie
+  app.use('/refresh', express.json({ limit: '10kb' }));
+  app.use('/spotify', express.json({ limit: '100kb' }));
   app.use(authRouter(config));
   app.use(spotifyProxyRouter());
 

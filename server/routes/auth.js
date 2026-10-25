@@ -16,15 +16,16 @@ const SCOPES = [
   'user-read-currently-playing',
 ];
 
-function postForm(params) {
+function postForm(params, timeoutMs) {
   return fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams(params).toString(),
+    signal: AbortSignal.timeout(timeoutMs),
   });
 }
 
-export function authRouter(config, { maxPending = 1000 } = {}) {
+export function authRouter(config, { maxPending = 1000, timeoutMs = 10_000 } = {}) {
   const router = express.Router();
   const pendingAuth = new Map();
 
@@ -65,7 +66,7 @@ export function authRouter(config, { maxPending = 1000 } = {}) {
         redirect_uri: config.redirectUri,
         client_id: config.spotifyClientId,
         code_verifier: verifier,
-      });
+      }, timeoutMs);
       const data = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(data));
 
@@ -90,7 +91,7 @@ export function authRouter(config, { maxPending = 1000 } = {}) {
         grant_type: 'refresh_token',
         refresh_token,
         client_id: config.spotifyClientId,
-      });
+      }, timeoutMs);
       if (!response.ok) throw new Error(`refresh ${response.status}`);
       res.json(await response.json());
     } catch {
