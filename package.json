@@ -2,32 +2,44 @@
   "name": "melodyo",
   "version": "1.0.0",
   "scripts": {
-    "dev": "node --watch-path=server.js server.js",
+    "dev": "node --watch-path=server.cjs server.cjs",
     "build": "vite build client",
-    "start": "vite build client && node server.js --prod",
+    "start": "vite build client && node server.cjs --prod",
     "lint": "eslint .",
-    "test": "vitest run",
-    "prepare": "husky"
+    "test": "vitest run --coverage",
+    "prepare": "husky",
+    "test:watch": "vitest",
+    "db": "node scripts/dev-db.js"
   },
   "dependencies": {
-    "axios": "^1.6.0",
+    "axios": "^1.20.0",
     "express": "^4.18.0",
+    "node-pg-migrate": "^9.0.0",
+    "pg": "^8.23.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
     "@vitejs/plugin-react": "^6.1.2",
+    "@vitest/coverage-v8": "^5.0.5",
+    "embedded-postgres": "^17.10.0-beta.17",
     "eslint": "^10.13.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.13.0",
     "husky": "^9.1.7",
+    "jsdom": "^29.1.1",
     "lint-staged": "^17.6.0",
+    "supertest": "^7.3.1",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"
   },
   "lint-staged": {
     "*.{js,jsx,mjs}": "eslint --max-warnings=0"
-  }
+  },
+  "type": "module"
 }
