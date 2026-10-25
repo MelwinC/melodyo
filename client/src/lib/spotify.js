@@ -1,3 +1,5 @@
+import { reloadOnHotUpdate } from './hot.js';
+
 const S = { token: null, refresh: null, expiry: 0 };
 
 export function loadTokens() {
@@ -54,5 +56,4 @@ export async function api(method, path, body) {
   return json;
 }
 
-// Module à état (tokens) : on recharge la page plutôt que de perdre l'état au hot reload
-if (import.meta.hot) import.meta.hot.accept(() => location.reload());
+reloadOnHotUpdate(import.meta.hot);

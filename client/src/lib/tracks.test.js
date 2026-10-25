@@ -7,7 +7,8 @@ vi.mock('./themes.js', async importOriginal => {
 });
 
 const { api } = await import('./spotify.js');
-const { buildTracks, loadThemePool } = await import('./tracks.js');
+const { buildTracks, getThemeCounts, loadThemePool } = await import('./tracks.js');
+const { getToast } = await import('./toast.js');
 
 const testThemes = {};
 let themeSeq = 0;
@@ -101,5 +102,82 @@ describe('buildTracks', () => {
     const b = makeTheme({ p2: 1 });
     const tracks = await buildTracks([a.id, b.id], 2, () => {});
     expect(tracks.filter(t => t.name === 'Commun')).toHaveLength(1);
+  });
+});
+
+describe('loadThemePool — cas limites', () => {
+  it('continue si une page de la playlist échoue', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const all = Array.from({ length: 120 }, (_, i) => track(`Son ${i}`));
+    api.mockImplementation(async (method, path) => {
+      const offset = Number(new URL(path, 'http://x').searchParams.get('offset'));
+      if (offset === 50) throw new Error('500');
+      return { total: all.length, items: all.slice(offset, offset + 50).map(item => ({ item })) };
+    });
+    const pool = await loadThemePool(makeTheme({ p1: 1 }));
+    expect(pool).toHaveLength(70);
+    expect(console.warn).toHaveBeenCalled();
+  });
+
+  it('traite une réponse sans total ni items comme une playlist vide', async () => {
+    api.mockResolvedValue({});
+    await expect(loadThemePool(makeTheme({ p1: 1 }))).rejects.toThrow(/vide ou inaccessible/);
+  });
+
+  it('ignore une playlist inaccessible si une autre répond', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockPlaylists({ p2: [track('Ok')] });
+    const fallback = api.getMockImplementation();
+    api.mockImplementation(async (method, path) => {
+      if (path.includes('/p1/')) throw new Error('403');
+      return fallback(method, path);
+    });
+    const pool = await loadThemePool(makeTheme({ p1: 1, p2: 1 }));
+    expect(pool.map(t => t.name)).toEqual(['Ok']);
+  });
+
+  it('écarte les titres vides une fois normalisés', async () => {
+    const playlists = { p1: [track('!!!', { id: 'x' }), track('', { id: 'y', name: undefined }), track('Vrai titre')] };
+    mockPlaylists(playlists);
+    const pool = await loadThemePool(makeTheme(playlists));
+    expect(pool.map(t => t.name)).toEqual(['Vrai titre']);
+  });
+
+  it('expose le nombre de sons disponibles par thème', async () => {
+    const playlists = { p1: [track('A'), track('B')] };
+    mockPlaylists(playlists);
+    const theme = makeTheme(playlists);
+    await loadThemePool(theme);
+    expect(getThemeCounts()[theme.id]).toBe(2);
+  });
+
+  it('réutilise le cache pour un thème déjà chargé', async () => {
+    const playlists = { p1: [track('A')] };
+    mockPlaylists(playlists);
+    const theme = makeTheme(playlists);
+    const first = await loadThemePool(theme);
+    expect(await loadThemePool(theme)).toBe(first);
+    expect(api).toHaveBeenCalledOnce();
+  });
+});
+
+describe('buildTracks — cas limites', () => {
+  it('classe les sons moyennement populaires avant les inconnus', async () => {
+    const playlists = { p1: [track('Inconnu', { popularity: undefined }), track('Moyen', { popularity: 35 })] };
+    mockPlaylists(playlists);
+    const theme = makeTheme(playlists);
+    const tracks = await buildTracks([theme.id], 1, () => {});
+    expect(tracks.map(t => t.name)).toEqual(['Moyen']);
+  });
+
+  it('ignore un thème inconnu et signale un thème en échec', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    api.mockResolvedValue({ total: 0, items: [] });
+    const theme = makeTheme({ p1: 1 });
+    const onProgress = vi.fn();
+    const tracks = await buildTracks(['inexistant', theme.id], 3, onProgress);
+    expect(tracks).toEqual([]);
+    expect(getToast().msg).toMatch(new RegExp(`${theme.label}.*vide ou inaccessible`));
+    expect(onProgress).toHaveBeenCalledWith(`🎵 Chargement : ${theme.label}…`, 40);
   });
 });

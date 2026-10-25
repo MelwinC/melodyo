@@ -1,5 +1,6 @@
 import { api, ensureToken, getToken } from './spotify.js';
 import { toast } from './toast.js';
+import { reloadOnHotUpdate } from './hot.js';
 
 let player = null;
 let deviceId = null;
@@ -132,7 +133,7 @@ export async function pollPosition() {
 }
 
 // Doit être appelé de façon synchrone dans un clic, sinon le navigateur peut bloquer l'audio
-export const activate = () => player?.activateElement?.();
+export const activate = () => player?.activateElement();
 
 export async function togglePlay() {
   if (!player) return;
@@ -152,5 +153,4 @@ export async function seekBy(deltaMs) {
   await player.seek(Math.max(0, Math.min(state.position + deltaMs, state.duration - 1000)));
 }
 
-// Module à état (lecteur SDK) : on recharge la page pour éviter un lecteur fantôme au hot reload
-if (import.meta.hot) import.meta.hot.accept(() => location.reload());
+reloadOnHotUpdate(import.meta.hot);

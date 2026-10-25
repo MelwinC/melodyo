@@ -1,6 +1,7 @@
 import { api } from './spotify.js';
 import { findTheme } from './themes.js';
 import { toast } from './toast.js';
+import { reloadOnHotUpdate } from './hot.js';
 
 const PAGE_SIZE = 50;
 const MAX_ITEMS_PER_PLAYLIST = 1000;
@@ -117,5 +118,4 @@ export async function buildTracks(themeIds, perTheme, onProgress) {
   return shuffle(all);
 }
 
-// Module à état (cache des playlists) : on recharge la page plutôt que de perdre l'état au hot reload
-if (import.meta.hot) import.meta.hot.accept(() => location.reload());
+reloadOnHotUpdate(import.meta.hot);
