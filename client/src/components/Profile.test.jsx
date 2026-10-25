@@ -8,6 +8,7 @@ import Profile from './Profile.jsx';
 
 vi.mock('../lib/session.js', async importOriginal => ({ ...(await importOriginal()), choosePreset: vi.fn(), uploadAvatar: vi.fn() }));
 vi.mock('../lib/toast.js', () => ({ toast: vi.fn() }));
+vi.mock('./Stats.jsx', () => ({ default: () => <p>statistiques du compte</p> }));
 afterEach(() => vi.clearAllMocks());
 
 const user = { username: 'Mel', avatar: { kind: 'preset', value: 'note' } };
@@ -19,6 +20,7 @@ describe('Profile', () => {
     render(<Profile user={user} onBack={onBack} />);
     expect(screen.getByRole('heading', { name: 'Mon profil' })).toBeInTheDocument();
     expect(screen.getByText('Mel')).toBeInTheDocument();
+    expect(screen.getByText('statistiques du compte')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'note' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getAllByRole('button', { pressed: false })).toHaveLength(11);
     await userEvent.click(screen.getByRole('button', { name: '← Retour' }));

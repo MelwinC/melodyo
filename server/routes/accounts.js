@@ -4,6 +4,7 @@ import { asyncRoute } from '../async-route.js';
 import { hashPassword, verifyPassword } from '../passwords.js';
 import { requireUser } from '../session-middleware.js';
 import { createSession, deleteSession, SESSION_COOKIE, SESSION_DAYS } from '../sessions.js';
+import { getStats } from '../stats.js';
 import { createUser, findUserById, findUserByUsername, UsernameTakenError } from '../users.js';
 
 const credentials = z.object({
@@ -56,6 +57,10 @@ export function accountsRouter({ pool, config, limiters }) {
   }));
 
   router.get('/api/me', requireUser, (req, res) => res.json({ user: req.user }));
+
+  router.get('/api/me/stats', requireUser, asyncRoute(async (req, res) => {
+    res.json({ stats: await getStats(pool, req.user.id) });
+  }));
 
   return router;
 }

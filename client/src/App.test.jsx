@@ -36,7 +36,12 @@ vi.mock('./components/GameDetail.jsx', () => ({ default: ({ gameId, onBack }) =>
 vi.mock('./components/ReviewList.jsx', () => ({ default: ({ onBack }) => <button onClick={onBack}>liste à revoir</button> }));
 vi.mock('./lib/toast.js', async importOriginal => ({ ...(await importOriginal()), toast: vi.fn() }));
 vi.mock('./components/Auth.jsx', () => ({ default: ({ onJoin }) => <button onClick={onJoin}>écran connexion</button> }));
-vi.mock('./components/LinkSpotify.jsx', () => ({ default: ({ user, onJoin }) => <button onClick={onJoin}>relier spotify {user.username}</button> }));
+vi.mock('./components/LinkSpotify.jsx', () => ({ default: ({ user, onJoin, onProfile }) => (
+  <div>
+    <button onClick={onJoin}>relier spotify {user.username}</button>
+    <button onClick={onProfile}>profil sans spotify</button>
+  </div>
+) }));
 vi.mock('./components/Profile.jsx', () => ({ default: ({ onBack }) => <button onClick={onBack}>écran profil</button> }));
 vi.mock('./components/Create.jsx', () => ({
   default: ({ user, onStart, onProfile, onHistory, onReview, onJoin, room, roomState, onCloseRoom }) => (
@@ -332,5 +337,13 @@ describe('App', () => {
       expect(sendRoom).toHaveBeenLastCalledWith({ type: 'game:final' });
       roomStore.state = null;
     });
+  });
+
+  it('ouvre le profil d\'un joueur sans Spotify puis revient', async () => {
+    store.snapshot = { status: 'ready', user: { ...user, spotifyLinked: false } };
+    render(<App />);
+    await userEvent.click(screen.getByText('profil sans spotify'));
+    await userEvent.click(screen.getByText('écran profil'));
+    expect(screen.getByText('relier spotify Mel')).toBeInTheDocument();
   });
 });

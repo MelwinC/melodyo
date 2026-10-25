@@ -139,10 +139,10 @@ export default function App() {
     content = <Join code={join} user={session.user} onLeave={leaveJoin} />;
   } else if (session.status === 'anonymous') {
     content = <Auth onJoin={openJoin} />;
-  } else if (!session.user.spotifyLinked) {
-    content = <LinkSpotify user={session.user} onJoin={openJoin} />;
   } else if (screen.name === 'profile') {
     content = <Profile user={session.user} onBack={toCreate} />;
+  } else if (!session.user.spotifyLinked) {
+    content = <LinkSpotify user={session.user} onJoin={openJoin} onProfile={() => setScreen({ name: 'profile' })} />;
   } else if (phase === 'correcting') {
     const { position } = roomState.correction;
     content = (

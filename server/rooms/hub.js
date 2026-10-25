@@ -1,6 +1,6 @@
 import { isPaused, openClock, pauseClock, remainingMs, resumeClock } from './clock.js';
 import {
-  getAnswers, getCorrections, getRevealed, getRoomGame, getTrack, listParticipants,
+  getAnswers, getCorrections, getGamePlayers, getRevealed, getRoomGame, getTrack, listParticipants,
   markRevealed, resetValidations, saveAnswer, setValidation, unreveal,
 } from './repo.js';
 import { getParticipantDetail, getScores, rank } from './scoring.js';
@@ -58,10 +58,12 @@ export function createHub({ pool, now = Date.now, setTimer = setTimeout, clearTi
     const corrections = target === null ? null : await getCorrections(pool, game.id, target);
     const revealed = [];
     for (const position of [...room.revealed].sort((a, b) => a - b)) revealed.push(await getTrack(pool, game.id, position));
-    const ids = participants.map(p => p.id);
-    const scores = game ? await getScores(pool, game.id, ids) : new Map();
+    // Classement et détails : seulement les joueurs de cette partie (au moins une réponse non vide)
+    const players = game ? await getGamePlayers(pool, game.id) : new Set();
+    const ranked = participants.filter(p => players.has(p.id));
+    const scores = await getScores(pool, game?.id, ranked.map(p => p.id));
     const details = new Map();
-    if (game) for (const id of ids) details.set(id, await getParticipantDetail(pool, game.id, id));
+    for (const p of ranked) details.set(p.id, await getParticipantDetail(pool, game.id, p.id));
 
     const connected = new Set([...room.conns].map(c => c.participantId));
     const base = {
@@ -77,7 +79,7 @@ export function createHub({ pool, now = Date.now, setTimer = setTimeout, clearTi
       phase: room.phase,
       correction: target === null ? null : { position: target },
       revealed,
-      scores: game ? rank(participants.map(p => ({ id: p.id, name: p.name, score: scores.get(p.id) }))) : [],
+      scores: rank(ranked.map(p => ({ id: p.id, name: p.name, score: scores.get(p.id) }))),
       final: room.phase === 'final' ? { details: Object.fromEntries(details) } : null,
     };
     const answered = [...answers].filter(([, a]) => a.title || a.artist).map(([id]) => id);
