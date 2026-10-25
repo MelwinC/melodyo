@@ -8,8 +8,26 @@ let initPromise = null;
 let playbackErrorCount = 0;
 let queue = [];
 
+/* ── OPTIONS DE PARTIE (extrait de 30 s, départ au milieu) ── */
+const EXTRACT_MS = 30000;
+let options = { timer: 'full', start: 'start' };
+let started = new Set();
+let playedMs = 0;
+let lastTick = null;
+
+// Temps d'écoute de l'extrait : ne s'écoule que pendant la lecture (la pause l'arrête, un saut de ±10 s ne change rien)
+function extractPatch(paused) {
+  const now = Date.now();
+  if (lastTick !== null) playedMs += now - lastTick;
+  lastTick = paused ? null : now;
+  if (options.timer !== '30s') return { remaining: null };
+  const remaining = Math.max(0, EXTRACT_MS - playedMs);
+  if (remaining === 0 && !paused) player.pause().catch(() => {});
+  return { remaining };
+}
+
 /* ── STORE (lu par les composants via useSyncExternalStore) ── */
-let snapshot = { paused: true, position: 0, duration: 0, sdkTrack: null, index: 0, total: 0, theme: null };
+let snapshot = { paused: true, position: 0, duration: 0, sdkTrack: null, index: 0, total: 0, theme: null, timer: 'full', remaining: null };
 const listeners = new Set();
 
 function update(patch) {
@@ -96,9 +114,16 @@ async function connectPlayer(onReady, onError) {
 export const isFirefox = /firefox|fxios/i.test(navigator.userAgent);
 
 /* ── LECTURE ── */
-export async function startQueue(tracks) {
+export async function startQueue(tracks, { timer = 'full', start = 'start', onTrackStart = () => {} } = {}) {
   queue = tracks;
-  update({ index: 0, total: tracks.length, sdkTrack: null, theme: null, position: 0, duration: 0 });
+  options = { timer, start, onTrackStart };
+  started = new Set();
+  playedMs = 0;
+  lastTick = null;
+  update({
+    index: 0, total: tracks.length, sdkTrack: null, theme: null, position: 0, duration: 0,
+    timer, remaining: timer === '30s' ? EXTRACT_MS : null,
+  });
 
   console.log(`[transfer] transfert vers device ${deviceId}…`);
   await api('PUT', '/me/player', { device_ids: [deviceId], play: false });
@@ -127,13 +152,24 @@ function onPlayerStateChanged(state) {
     const idx = queue.findIndex(t => trackUris(t).some(u => uris.includes(u)));
     if (idx >= 0) patch.index = idx;
     patch.theme = idx >= 0 ? { id: queue[idx]._themeId, label: queue[idx]._themeLabel } : null;
+
+    // Nouvelle chanson (ou retour sur une précédente) : l'extrait repart de zéro
+    playedMs = 0;
+    lastTick = null;
+    if (options.start === 'middle') {
+      player.seek(Math.max(0, Math.floor(state.duration / 2) - (options.timer === '30s' ? 15000 : 0)));
+    }
+    if (idx >= 0 && !started.has(idx)) {
+      started.add(idx);
+      options.onTrackStart(idx);
+    }
   }
-  update(patch);
+  update({ ...patch, ...extractPatch(state.paused) });
 }
 
 export async function pollPosition() {
   const state = await player?.getCurrentState();
-  if (state) update({ position: state.position, duration: state.duration });
+  if (state) update({ position: state.position, duration: state.duration, ...extractPatch(state.paused) });
 }
 
 // Doit être appelé de façon synchrone dans un clic, sinon le navigateur peut bloquer l'audio

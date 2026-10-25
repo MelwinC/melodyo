@@ -304,3 +304,99 @@ describe('isFirefox', () => {
     expect(mod.isFirefox).toBe(true);
   });
 });
+
+describe('options de lecture', () => {
+  async function queued(options, tracks = [track('a'), track('b')]) {
+    const p = await readyPlayer();
+    vi.useFakeTimers({ now: 1_000_000 });
+    const done = mod.startQueue(tracks, options);
+    await vi.advanceTimersByTimeAsync(600);
+    await done;
+    return p;
+  }
+  const playingState = (uri, extra = {}) => ({ paused: false, position: 0, duration: 200000, track_window: { current_track: { uri } }, ...extra });
+
+  it('démarre au milieu de la chanson', async () => {
+    const p = await queued({ start: 'middle' });
+    p.emit('player_state_changed', playingState('a'));
+    expect(p.seek).toHaveBeenCalledWith(100000);
+  });
+
+  it('centre l\'extrait de 30 s au milieu, sans passer sous zéro', async () => {
+    const p = await queued({ start: 'middle', timer: '30s' });
+    p.emit('player_state_changed', playingState('a'));
+    expect(p.seek).toHaveBeenLastCalledWith(85000);
+    p.emit('player_state_changed', playingState('b', { duration: 20000 }));
+    expect(p.seek).toHaveBeenLastCalledWith(0);
+  });
+
+  it('ne déplace pas la lecture en mode début', async () => {
+    const p = await queued({});
+    p.emit('player_state_changed', playingState('a'));
+    expect(p.seek).not.toHaveBeenCalled();
+    expect(mod.getPlayerSnapshot()).toMatchObject({ timer: 'full', remaining: null });
+  });
+
+  it('signale chaque chanson une seule fois, même après un retour arrière', async () => {
+    const onTrackStart = vi.fn();
+    const p = await queued({ onTrackStart });
+    for (const uri of ['a', 'b', 'a', 'zzz']) p.emit('player_state_changed', playingState(uri));
+    expect(onTrackStart.mock.calls).toEqual([[0], [1]]);
+  });
+
+  it('met en pause au bout de 30 s de lecture', async () => {
+    const p = await queued({ timer: '30s' });
+    p.getCurrentState.mockImplementation(async () => playingState('a'));
+    p.emit('player_state_changed', playingState('a'));
+    expect(mod.getPlayerSnapshot().remaining).toBe(30000);
+    vi.advanceTimersByTime(29000);
+    await mod.pollPosition();
+    expect(mod.getPlayerSnapshot().remaining).toBe(1000);
+    expect(p.pause).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
+    await mod.pollPosition();
+    expect(mod.getPlayerSnapshot().remaining).toBe(0);
+    expect(p.pause).toHaveBeenCalledOnce();
+  });
+
+  it('arrête le décompte pendant la pause et l\'ignore aux sauts de ±10 s', async () => {
+    const p = await queued({ timer: '30s' });
+    p.emit('player_state_changed', playingState('a'));
+    vi.advanceTimersByTime(10000);
+    p.emit('player_state_changed', playingState('a', { paused: true, position: 10000 }));
+    vi.advanceTimersByTime(60000);
+    p.getCurrentState.mockResolvedValue(playingState('a', { paused: true, position: 10000 }));
+    await mod.pollPosition();
+    expect(mod.getPlayerSnapshot().remaining).toBe(20000);
+    p.emit('player_state_changed', playingState('a', { position: 80000 }));
+    expect(mod.getPlayerSnapshot().remaining).toBe(20000);
+    expect(p.pause).not.toHaveBeenCalled();
+  });
+
+  it('repart à 30 s sur la chanson suivante ou précédente', async () => {
+    const p = await queued({ timer: '30s' });
+    p.emit('player_state_changed', playingState('a'));
+    vi.advanceTimersByTime(20000);
+    p.emit('player_state_changed', playingState('b'));
+    expect(mod.getPlayerSnapshot().remaining).toBe(30000);
+  });
+
+  it('ne met jamais en pause en mode chanson entière', async () => {
+    const p = await queued({ timer: 'full' });
+    p.getCurrentState.mockImplementation(async () => playingState('a'));
+    p.emit('player_state_changed', playingState('a'));
+    vi.advanceTimersByTime(120000);
+    await mod.pollPosition();
+    expect(p.pause).not.toHaveBeenCalled();
+  });
+
+  it('ignore l\'échec de la pause automatique', async () => {
+    const p = await queued({ timer: '30s' });
+    p.pause.mockRejectedValue(new Error('no'));
+    p.emit('player_state_changed', playingState('a'));
+    vi.advanceTimersByTime(30000);
+    p.emit('player_state_changed', playingState('a', { position: 30000 }));
+    await Promise.resolve();
+    expect(p.pause).toHaveBeenCalled();
+  });
+});

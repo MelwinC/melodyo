@@ -157,4 +157,25 @@ describe('Player', () => {
     vi.advanceTimersByTime(1000);
     expect(pollPosition).toHaveBeenCalledTimes(2);
   });
+
+  it('affiche le décompte de l\'extrait de 30 s', () => {
+    store.snapshot = { ...store.snapshot, timer: '30s', remaining: 12400 };
+    ready();
+    expect(screen.getByText('0:13')).toHaveClass('extract-timer');
+  });
+
+  it('n\'affiche pas de décompte en mode chanson entière', () => {
+    store.snapshot = { ...store.snapshot, timer: 'full', remaining: null };
+    ready();
+    expect(document.querySelector('.extract-timer')).toBeNull();
+  });
+
+  it('remplace la pochette à chaque chanson pour qu\'elle n\'apparaisse jamais nette', async () => {
+    ready();
+    await userEvent.click(reveal());
+    const before = cover();
+    setSnapshot({ sdkTrack: sdkTrack('b'), index: 3 });
+    expect(cover()).not.toBe(before);
+    expect(cover()).toHaveClass('blur');
+  });
 });

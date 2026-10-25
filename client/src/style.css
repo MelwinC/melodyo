@@ -299,7 +299,13 @@ input[type="range"] {
   transition: filter .4s;
   box-shadow: 0 16px 48px rgba(0,0,0,.5);
 }
-.album-cover.blur { filter: blur(28px) brightness(.5); }
+.album-cover.blur { filter: blur(48px) brightness(.4); transition: none; }
+.extract-timer {
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--green);
+}
 .album-counter {
   position: absolute;
   top: 50%;

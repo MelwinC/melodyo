@@ -5,6 +5,9 @@ import {
   togglePlay, nextTrack, previousTrack, seek, seekBy,
 } from '../lib/player.js';
 
+// Décompte de l'extrait : arrondi à la seconde supérieure (0:01 jusqu'au dernier instant)
+const fmtCountdown = ms => fmtTime(Math.ceil(ms / 1000) * 1000);
+
 function fmtTime(ms) {
   const s = Math.floor(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -72,12 +75,15 @@ export default function Player({ title, status, loadingText, error, onExit, onBa
       {status === 'ready' && (
         <div className="player-body show">
           <div className="album-wrap">
-            <div className={`album-cover${revealed ? '' : ' blur'}`}
+            {/* Une nouvelle chanson remplace l'élément : aucune transition ne peut montrer la pochette nette */}
+            <div key={uri} className={`album-cover${revealed ? '' : ' blur'}`}
               style={cover ? { backgroundImage: `url(${cover})` } : undefined}></div>
             <div className={`album-counter${revealed ? ' hide' : ''}`}>
               {snap.index + 1} / {snap.total || '?'}
             </div>
           </div>
+
+          {snap.remaining != null && <div className="extract-timer">{fmtCountdown(snap.remaining)}</div>}
 
           <div className={`track-info${revealed ? ' show' : ''}`}>
             <div className="track-artists">{revealed && (track?.artists || []).map(a => a.name).join(', ')}</div>
