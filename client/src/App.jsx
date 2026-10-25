@@ -53,14 +53,23 @@ export default function App() {
     loadSession();
   }, []);
 
+  // Page du créateur rechargée en pleine partie : le lecteur est perdu, on termine proprement
+  // la partie restée ouverte côté serveur pour débloquer les participants
+  const orphanGameId = host.live.state?.game?.id;
+  useEffect(() => {
+    if (!orphanGameId || orphanGameId === live.current.gameId) return;
+    sendRoom({ type: 'game:end' });
+    endGame(orphanGameId).catch(() => {});
+  }, [orphanGameId]);
+
   async function startGame(tracks, title, { gameId, timer, start, reviewUris }) {
     console.log(`[start] lancement de la partie — ${tracks.length} sons`);
     const show = (status, extra = {}) => setScreen({ name: 'player', title, status, gameId, tracks, reviewUris, ...extra });
+    live.current = { gameId, round: null };
     try {
       show('loading', { loadingText: 'Connexion au lecteur Spotify…' });
       await ensurePlayer();
       show('loading', { loadingText: 'Lancement…' });
-      live.current = { gameId, round: null };
       sendRoom({ type: 'game:start', gameId });
       await startQueue(tracks, {
         timer,

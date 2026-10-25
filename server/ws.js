@@ -27,15 +27,24 @@ const INVALID = { type: 'error', error: 'invalid_message' };
 export function attachWebSocket(httpServer, { pool, hub, pingMs = 30_000 }) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4096 });
 
+  // Une URL ou une origine malformée ne doit jamais faire planter le serveur (aucune session requise)
+  const hostOf = url => {
+    try {
+      return new URL(url).host;
+    } catch {
+      return null;
+    }
+  };
+
   httpServer.on('upgrade', (req, socket, head) => {
     // Les autres connexions WebSocket (hot reload de Vite en dev) ne sont pas les nôtres ;
     // sans autre écouteur (prod), on les ferme plutôt que de les laisser pendantes
-    if (new URL(req.url, 'http://localhost').pathname !== '/ws') {
+    if (!/^\/ws(\?|$)/.test(req.url)) {
       if (httpServer.listenerCount('upgrade') === 1) socket.destroy();
       return;
     }
     const { origin } = req.headers;
-    if (origin && new URL(origin).host !== req.headers.host) {
+    if (origin && hostOf(origin) !== req.headers.host) {
       socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
       return;
     }
@@ -77,8 +86,12 @@ export function attachWebSocket(httpServer, { pool, hub, pingMs = 30_000 }) {
           send(FORBIDDEN);
           return ws.close(4403);
         }
-        joined = { roomId: auth.room.id, conn: { role: auth.role, participantId: auth.participantId, send } };
-        return hub.connect(joined.roomId, joined.conn);
+        const conn = { role: auth.role, participantId: auth.participantId, send };
+        await hub.connect(auth.room.id, conn);
+        // Socket fermée pendant l'authentification : on ne laisse pas de connexion fantôme dans la room
+        if (ws.readyState !== ws.OPEN) return hub.disconnect(auth.room.id, conn);
+        joined = { roomId: auth.room.id, conn };
+        return;
       }
 
       if (joined.conn.role === 'host') {
@@ -99,6 +112,8 @@ export function attachWebSocket(httpServer, { pool, hub, pingMs = 30_000 }) {
     ws.on('message', raw => {
       queue = queue.then(() => handle(raw)).catch(err => {
         console.error('[ws]', err.message);
+        // Échec avant d'avoir rejoint (base indisponible) : fermeture que le client réessaie (1011)
+        if (!joined) return ws.close(1011);
         send({ type: 'error', error: 'server_error' });
       });
     });

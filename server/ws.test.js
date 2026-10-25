@@ -74,6 +74,24 @@ describe('connexion WebSocket', () => {
     await expect(c.opened).rejects.toThrow(/403/);
   });
 
+  it.each([
+    ['une origine « null » (iframe isolée)', { Origin: 'null' }, '/ws'],
+    ['une origine malformée', { Origin: 'http://a:b:c' }, '/ws'],
+  ])('refuse sans planter %s', async (_, headers, path) => {
+    const ws = new WebSocket(`ws://127.0.0.1:${new URL(base).port}${path}`, { headers });
+    await new Promise(resolve => ws.once('error', resolve));
+    expect((await fetch(`${base}/healthz`)).status).toBe(200);
+  });
+
+  it('survit à une cible de requête malformée', async () => {
+    const net = await import('node:net');
+    const socket = net.connect(new URL(base).port, '127.0.0.1');
+    await new Promise(resolve => socket.once('connect', resolve));
+    socket.write('GET http://a:b:c/ws HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n');
+    await new Promise(resolve => { socket.once('close', resolve); socket.once('error', resolve); });
+    expect((await fetch(`${base}/healthz`)).status).toBe(200);
+  });
+
   it('ignore les connexions qui ne visent pas /ws', async () => {
     const ws = new WebSocket(wsUrl.replace('/ws', '/autre'));
     const closed = await new Promise(resolve => { ws.once('error', () => resolve(true)); ws.once('open', () => resolve(false)); });
@@ -209,23 +227,59 @@ describe('partie en direct', () => {
   });
 });
 
-describe('erreur interne', () => {
-  it('répond server_error si le hub échoue', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    const { host, room } = await roomWithGame();
+describe('erreurs internes et fermetures prématurées', () => {
+  async function serverWith(hub) {
     const pool = createPool(testDatabaseUrl());
     const other = http.createServer();
-    const realtime = attachWebSocket(other, { pool, hub: { connect: () => Promise.reject(new Error('boom')), disconnect: async () => {} } });
+    const realtime = attachWebSocket(other, { pool, hub });
     await new Promise(resolve => other.listen(0, '127.0.0.1', resolve));
-    const ws = new WebSocket(`ws://127.0.0.1:${other.address().port}/ws`, { headers: { Cookie: host.cookie } });
+    return {
+      url: `ws://127.0.0.1:${other.address().port}/ws`,
+      async close() {
+        realtime.close();
+        await new Promise(resolve => other.close(resolve));
+        await pool.end();
+      },
+    };
+  }
+
+  it('ferme avec un code réessayable si la base échoue pendant la connexion', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { host, room } = await roomWithGame();
+    const srv = await serverWith({ connect: () => Promise.reject(new Error('boom')), disconnect: async () => {} });
+    const ws = new WebSocket(srv.url, { headers: { Cookie: host.cookie } });
+    await new Promise(resolve => ws.once('open', resolve));
+    const closed = new Promise(resolve => ws.once('close', resolve));
+    ws.send(JSON.stringify({ type: 'hello', code: room.code, role: 'host' }));
+    expect(await closed).toBe(1011);
+    await srv.close();
+  });
+
+  it('répond server_error si le hub échoue une fois connecté', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { host, room } = await roomWithGame();
+    const srv = await serverWith({ connect: async () => {}, disconnect: async () => {}, hostEvent: () => Promise.reject(new Error('boom')) });
+    const ws = new WebSocket(srv.url, { headers: { Cookie: host.cookie } });
     await new Promise(resolve => ws.once('open', resolve));
     const reply = new Promise(resolve => ws.once('message', data => resolve(JSON.parse(data))));
     ws.send(JSON.stringify({ type: 'hello', code: room.code, role: 'host' }));
+    ws.send(JSON.stringify({ type: 'game:end' }));
     expect(await reply).toEqual({ type: 'error', error: 'server_error' });
     ws.close();
-    realtime.close();
-    await new Promise(resolve => other.close(resolve));
-    await pool.end();
+    await srv.close();
+  });
+
+  it('ne laisse pas de connexion fantôme si la socket se ferme pendant l\'authentification', async () => {
+    const { host, room } = await roomWithGame();
+    const hub = { connect: vi.fn(async () => {}), disconnect: vi.fn(async () => {}) };
+    const srv = await serverWith(hub);
+    const ws = new WebSocket(srv.url, { headers: { Cookie: host.cookie } });
+    await new Promise(resolve => ws.once('open', resolve));
+    ws.send(JSON.stringify({ type: 'hello', code: room.code, role: 'host' }));
+    ws.terminate();
+    await vi.waitFor(() => expect(hub.connect).toHaveBeenCalled());
+    await vi.waitFor(() => expect(hub.disconnect).toHaveBeenCalledTimes(hub.connect.mock.calls.length));
+    await srv.close();
   });
 });
 

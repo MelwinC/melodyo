@@ -26,16 +26,29 @@ export default function PlayerSeat({ code, participant, onLeave }) {
 
   useEffect(() => () => clearTimeout(sendTimer.current), []);
 
+  const saved = state?.you?.answer;
+  const open = round?.status === 'open';
+  const differs = (saved?.title ?? '') !== draft.title || (saved?.artist ?? '') !== draft.artist;
+
+  // Au réveil d'un téléphone, une réponse peut être partie dans une connexion déjà morte :
+  // à chaque nouvel état, si le serveur n'a pas la dernière version (et qu'aucun envoi n'est prévu), on la renvoie
+  useEffect(() => {
+    if (open && differs && !sendTimer.current) sendRoom({ type: 'answer', position: round.position, ...draft });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live.receivedAt]);
+
   function edit(field, value) {
     const next = { ...draft, [field]: value };
     setDraft(next);
     clearTimeout(sendTimer.current);
-    sendTimer.current = setTimeout(() => sendRoom({ type: 'answer', position: round.position, ...next }), SEND_DELAY_MS);
+    sendTimer.current = setTimeout(() => {
+      sendTimer.current = null;
+      sendRoom({ type: 'answer', position: round.position, ...next });
+    }, SEND_DELAY_MS);
   }
 
-  const ackClosed = live.lastAck?.status === 'closed' && live.lastAck.position === round?.position;
-  const locked = round?.status === 'closed' || ackClosed;
-  const saved = state?.you?.answer;
+  // Seul l'état du serveur verrouille : un vieil accusé ne bloque pas une manche rouverte
+  const locked = round?.status === 'closed';
   const isSaved = Boolean(saved) && (saved.title || saved.artist) && saved.title === draft.title && saved.artist === draft.artist;
 
   return (

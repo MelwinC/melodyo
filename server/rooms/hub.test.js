@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { testDatabaseUrl } from '../../test/db.js';
 import { insertUser } from '../../test/factories.js';
 import { settings, track } from '../../test/games.js';
@@ -270,5 +270,22 @@ describe('mémoire', () => {
     await hub.connect(room.id, conn('player', a.id));
     await timers.advance(3600 * 1000);
     expect(await hub.answer(room.id, a.id, { position: 0, title: 'x', artist: '' })).toBe('saved');
+  });
+});
+
+describe('pannes de base', () => {
+  it('journalise sans planter si la diffusion échoue à la fermeture d\'une manche', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const toggle = { fail: false };
+    const flaky = { query: (...args) => (toggle.fail ? Promise.reject(new Error('down')) : pool.query(...args)) };
+    const fragile = createHub({ pool: flaky, now: () => clock.now, setTimer: timers.setTimer, clearTimer: timers.clearTimer });
+    const { room, gameId } = await setup();
+    await fragile.connect(room.id, conn('host'));
+    await fragile.hostEvent(room.id, { type: 'game:start', gameId });
+    await fragile.hostEvent(room.id, { type: 'round:start', position: 0, durationMs: 1 });
+    toggle.fail = true;
+    await timers.advance(90000);
+    await vi.waitFor(() => expect(error).toHaveBeenCalledWith('[hub]', 'down'));
+    error.mockRestore();
   });
 });

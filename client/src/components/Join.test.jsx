@@ -86,4 +86,14 @@ describe('Join', () => {
     expect(connectRoom).toHaveBeenCalledWith('ABC234', 'player');
     expect(joinRoom).not.toHaveBeenCalled();
   });
+
+  it('reprend sa place après avoir tapé le code et met le lien dans l\'adresse', async () => {
+    myParticipant.mockResolvedValue({ id: 'p9', name: 'Déjà là' });
+    history.replaceState({}, '', '/r/');
+    render(<Join code="" user={null} onLeave={vi.fn()} />);
+    await userEvent.type(screen.getByLabelText('Code de la room'), 'abc234');
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    expect(await screen.findByRole('button', { name: 'siège ABC234 Déjà là' })).toBeInTheDocument();
+    expect(location.pathname).toBe('/r/ABC234');
+  });
 });

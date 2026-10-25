@@ -232,4 +232,23 @@ describe('App', () => {
     const { container } = render(<App />);
     expect(container.querySelector('.player-loading-spinner')).toBeInTheDocument();
   });
+
+  it('termine la partie orpheline laissée par un rechargement de la page du créateur', () => {
+    store.snapshot = { status: 'ready', user };
+    host.value.live = { connected: true, state: { participants: [], game: { id: 'ancienne' } } };
+    render(<App />);
+    expect(sendRoom).toHaveBeenCalledWith({ type: 'game:end' });
+    expect(endGame).toHaveBeenCalledWith('ancienne');
+  });
+
+  it('ne touche pas à la partie en cours de lancement', async () => {
+    store.snapshot = { status: 'ready', user };
+    ensurePlayer.mockReturnValue(new Promise(() => {}));
+    const { rerender } = render(<App />);
+    await userEvent.click(screen.getByText('écran création Mel'));
+    host.value = { ...host.value, live: { connected: true, state: { participants: [], game: { id: 'g1' } } } };
+    sendRoom.mockClear();
+    rerender(<App />);
+    expect(sendRoom).not.toHaveBeenCalledWith({ type: 'game:end' });
+  });
 });

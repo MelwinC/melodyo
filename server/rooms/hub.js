@@ -8,6 +8,8 @@ const IDLE_MS = 2 * 3600 * 1000;
 
 // État des rooms en mémoire : le serveur décide seul de l'ouverture et de la fermeture des manches.
 // Les participants ne reçoivent jamais d'information sur les chansons.
+const logError = err => console.error('[hub]', err.message);
+
 export function createHub({ pool, now = Date.now, setTimer = setTimeout, clearTimer = clearTimeout }) {
   const rooms = new Map();
 
@@ -26,7 +28,7 @@ export function createHub({ pool, now = Date.now, setTimer = setTimeout, clearTi
     room.timer = setTimer(() => {
       room.timer = null;
       room.round.status = 'closed';
-      return broadcast(roomId);
+      return broadcast(roomId).catch(logError);
     }, remainingMs(room.round.clock, now()));
   }
 

@@ -96,10 +96,34 @@ describe('PlayerSeat', () => {
     expect(title()).toHaveValue('Mon titre');
   });
 
-  it('verrouille aussi sur un accusé « fermée » du serveur', () => {
+  it('ne reste pas verrouillé par un vieil accusé quand la manche est rouverte', () => {
     store.snapshot = live({ game, round: open() }, { lastAck: { type: 'answer:ack', position: 3, status: 'closed' } });
     seat();
-    expect(screen.getByText('Réponses verrouillées')).toBeInTheDocument();
+    expect(screen.queryByText('Réponses verrouillées')).toBeNull();
+    expect(title()).toBeEnabled();
+  });
+
+  it('renvoie la réponse si le serveur ne l\'a pas reçue (téléphone qui se réveille)', () => {
+    vi.useFakeTimers();
+    store.snapshot = live({ game, round: open() });
+    seat();
+    fireEvent.change(title(), { target: { value: 'Perdue' } });
+    act(() => vi.advanceTimersByTime(400));
+    expect(sendRoom).toHaveBeenCalledOnce();
+    setLive(live({ game, round: open(), you: { id: 'p1', answer: null } }, { receivedAt: Date.now() + 1 }));
+    expect(sendRoom).toHaveBeenCalledTimes(2);
+    expect(sendRoom).toHaveBeenLastCalledWith({ type: 'answer', position: 3, title: 'Perdue', artist: '' });
+    setLive(live({ game, round: open(), you: { id: 'p1', answer: { title: 'Perdue', artist: '' } } }, { receivedAt: Date.now() + 2 }));
+    expect(sendRoom).toHaveBeenCalledTimes(2);
+  });
+
+  it('n\'envoie rien de plus pendant la frappe', () => {
+    vi.useFakeTimers();
+    store.snapshot = live({ game, round: open() });
+    seat();
+    fireEvent.change(title(), { target: { value: 'En cours' } });
+    setLive(live({ game, round: open() }, { receivedAt: Date.now() + 1 }));
+    expect(sendRoom).not.toHaveBeenCalled();
   });
 
   it('fige le décompte pendant la pause', () => {

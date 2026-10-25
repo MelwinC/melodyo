@@ -12,6 +12,8 @@ const roomNotFound = res => res.status(404).json({ error: 'room_not_found' });
 
 export function roomsRouter({ pool, config, limiters, hub }) {
   const router = express.Router();
+  // La diffusion temps réel ne doit jamais faire échouer (ni planter) l'inscription d'un participant
+  const notify = roomId => Promise.resolve(hub.participantsChanged(roomId)).catch(err => console.error('[rooms]', err.message));
 
   async function roomFromParam(req) {
     const code = normalizeRoomCode(req.params.code);
@@ -53,7 +55,7 @@ export function roomsRouter({ pool, config, limiters, hub }) {
 
     if (req.user && guestName === undefined) {
       const participant = await joinAsUser(pool, room.id, req.user.id);
-      hub.participantsChanged(room.id);
+      notify(room.id);
       return res.json({ participant });
     }
 
@@ -63,7 +65,7 @@ export function roomsRouter({ pool, config, limiters, hub }) {
     res.cookie(guestCookieName(room.code), token, {
       httpOnly: true, sameSite: 'lax', secure: config.prod, path: '/', maxAge: GUEST_DAYS * 24 * 3600 * 1000,
     });
-    hub.participantsChanged(room.id);
+    notify(room.id);
     res.json({ participant });
   }));
 

@@ -170,7 +170,9 @@ function onPlayerStateChanged(state) {
     if (options.start === 'middle') player.seek(startAt);
     // Chaque démarrage (retour arrière compris) rouvre la manche ; seule la première écoute compte comme jouée
     if (idx >= 0) {
-      options.onTrackStart(idx, state.duration - startAt, !started.has(idx));
+      // Durée inconnue (premier événement du SDK incomplet) : 5 minutes plutôt qu'une manche impossible
+      const remainingMs = state.duration - startAt;
+      options.onTrackStart(idx, remainingMs > 0 ? remainingMs : 300_000, !started.has(idx));
       started.add(idx);
     }
   }

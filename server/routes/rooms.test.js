@@ -90,6 +90,16 @@ describe('POST /api/rooms/:code/join', () => {
     expect((await request(app).post(`/api/rooms/${room.code}/join`).send({})).body).toEqual({ error: 'invalid_name' });
   });
 
+  it('accepte le participant même si la diffusion temps réel échoue', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { room } = await hostWithRoom();
+    const broken = createTestApp(pool, { hub: { participantsChanged: () => Promise.reject(new Error('down')) } });
+    const res = await request(broken).post(`/api/rooms/${room.code}/join`).send({ guestName: 'Malgré tout' });
+    expect(res.status).toBe(200);
+    await vi.waitFor(() => expect(error).toHaveBeenCalledWith('[rooms]', 'down'));
+    error.mockRestore();
+  });
+
   it('fonctionne sans diffusion temps réel branchée', async () => {
     const { room } = await hostWithRoom();
     const res = await request(createTestApp(pool)).post(`/api/rooms/${room.code}/join`).send({ guestName: 'Seul' });

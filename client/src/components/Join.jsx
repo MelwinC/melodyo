@@ -13,25 +13,28 @@ export default function Join({ code: initialCode, user, onLeave }) {
   const [busy, setBusy] = useState(false);
   const [seat, setSeat] = useState(null);
 
-  // Lien d'invitation : si l'appareil a déjà rejoint (rechargement, veille), il reprend directement sa place
+  // Room trouvée : le lien va dans l'adresse (un rechargement y revient) et, si l'appareil
+  // a déjà rejoint (rechargement, veille), il reprend directement sa place
+  function showRoom(found) {
+    history.replaceState({}, '', `/r/${found.code}`);
+    setRoom(found);
+    return myParticipant(found.code).then(participant => {
+      if (!participant) return;
+      connectRoom(found.code, 'player');
+      setSeat({ code: found.code, participant });
+    });
+  }
+
   useEffect(() => {
     if (!initialCode) return;
-    getRoomInfo(initialCode)
-      .then(async found => {
-        setRoom(found);
-        const participant = await myParticipant(found.code);
-        if (!participant) return;
-        connectRoom(found.code, 'player');
-        setSeat({ code: found.code, participant });
-      })
-      .catch(err => setError(messageFor(err.code)));
+    getRoomInfo(initialCode).then(showRoom).catch(err => setError(messageFor(err.code)));
   }, [initialCode]);
 
   async function lookup(e) {
     e.preventDefault();
     setError('');
     try {
-      setRoom(await getRoomInfo(code));
+      await showRoom(await getRoomInfo(code));
     } catch (err) {
       setError(messageFor(err.code));
     }

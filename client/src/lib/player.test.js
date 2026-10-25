@@ -344,6 +344,13 @@ describe('options de lecture', () => {
     expect(onTrackStart.mock.calls).toEqual([[0, 100000, true], [1, 100000, true], [0, 100000, false]]);
   });
 
+  it('donne 5 minutes à une chanson de durée inconnue', async () => {
+    const onTrackStart = vi.fn();
+    const p = await queued({ onTrackStart });
+    p.emit('player_state_changed', playingState('a', { duration: 0 }));
+    expect(onTrackStart).toHaveBeenCalledWith(0, 300000, true);
+  });
+
   it('donne la durée complète en mode début', async () => {
     const onTrackStart = vi.fn();
     const p = await queued({ onTrackStart });
