@@ -1,11 +1,13 @@
 import express from 'express';
 import { authRouter } from './routes/auth.js';
+import { healthRouter } from './routes/health.js';
 import { spotifyProxyRouter } from './routes/spotify-proxy.js';
 
-export function createApp({ config }) {
+export function createApp({ config, pool }) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '10kb' }));
+  app.use(healthRouter(pool));
   app.use(authRouter(config));
   app.use(spotifyProxyRouter());
 

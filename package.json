@@ -2,9 +2,9 @@
   "name": "melodyo",
   "version": "1.0.0",
   "scripts": {
-    "dev": "node --watch-path=server.cjs server.cjs",
+    "dev": "node --watch-path=server server/main.js",
     "build": "vite build client",
-    "start": "vite build client && node server.cjs --prod",
+    "start": "vite build client && node server/main.js --prod",
     "lint": "eslint .",
     "test": "vitest run --coverage",
     "prepare": "husky",
