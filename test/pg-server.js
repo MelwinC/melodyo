@@ -20,6 +20,8 @@ const port = await freePort();
 const databaseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'melodyo-pg-'));
 const pg = new EmbeddedPostgres({
   databaseDir, port, user: 'postgres', password: 'postgres', persistent: false, onLog: () => {},
+  // Chaque fichier de test ouvre son propre pool, en parallèle : la limite par défaut (100) sature
+  postgresFlags: ['-c', 'max_connections=300'],
 });
 await pg.initialise();
 await pg.start();
