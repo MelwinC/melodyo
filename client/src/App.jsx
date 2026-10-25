@@ -1,26 +1,30 @@
 import { useEffect, useState } from 'react';
-import { api, loadTokens, saveTokens } from './lib/spotify.js';
+import { api, getToken, loadTokens, saveTokens } from './lib/spotify.js';
 import { ensurePlayer, pause, startQueue } from './lib/player.js';
 import Login from './components/Login.jsx';
 import Create from './components/Create.jsx';
 import Player from './components/Player.jsx';
 import Toast from './components/Toast.jsx';
 
+// Récupère les tokens renvoyés par /callback ; true si l'utilisateur a une session
+function readAuthParams() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('access_token')) {
+    saveTokens(params.get('access_token'), params.get('refresh_token'), parseInt(params.get('expires_in')));
+    history.replaceState({}, '', '/');
+  }
+  if (params.get('error')) {
+    alert('Erreur de connexion : ' + params.get('error'));
+    history.replaceState({}, '', '/');
+  }
+  return loadTokens();
+}
+
 export default function App() {
-  const [screen, setScreen] = useState({ name: 'loading' });
+  const [screen, setScreen] = useState(() => ({ name: readAuthParams() ? 'loading' : 'login' }));
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    if (params.get('access_token')) {
-      saveTokens(params.get('access_token'), params.get('refresh_token'), parseInt(params.get('expires_in')));
-      history.replaceState({}, '', '/');
-    }
-    if (params.get('error')) {
-      alert('Erreur de connexion : ' + params.get('error'));
-      history.replaceState({}, '', '/');
-    }
-
-    if (!loadTokens()) { setScreen({ name: 'login' }); return; }
+    if (!getToken()) return;
     api('GET', '/me')
       .then(() => setScreen({ name: 'create' }))
       .catch(() => setScreen({ name: 'login' }));

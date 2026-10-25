@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { THEMES, MIN_PER_THEME, MAX_PER_THEME, findTheme } from '../lib/themes.js';
+import { THEMES, findTheme, sliderBounds } from '../lib/themes.js';
 import { buildTracks, getThemeCounts, loadThemePool } from '../lib/tracks.js';
 import { activate, disconnect, ensurePlayer, isFirefox } from '../lib/player.js';
 import { toast } from '../lib/toast.js';
@@ -43,14 +43,7 @@ export default function Create({ onStart }) {
       });
   }
 
-  // La borne max du slider = le plus petit nombre de sons disponibles parmi les thèmes sélectionnés
-  const pending = selected.some(id => typeof counts[id] !== 'number');
-  let max = MAX_PER_THEME;
-  let limitedBy = null;
-  selected.forEach(id => {
-    if (counts[id] < max) { max = counts[id]; limitedBy = findTheme(id); }
-  });
-  const min = Math.min(MIN_PER_THEME, max);
+  const { min, max, limitedBy, pending } = sliderBounds(selected, counts);
   const value = Math.max(min, Math.min(perTheme, max));
 
   const maxInfo = pending ? 'calcul des sons…'

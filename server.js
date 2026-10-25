@@ -131,7 +131,7 @@ app.post('/refresh', async (req, res) => {
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
     res.json(data);
-  } catch (err) {
+  } catch {
     res.status(400).json({ error: 'refresh_failed' });
   }
 });
