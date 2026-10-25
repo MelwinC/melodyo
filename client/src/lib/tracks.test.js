@@ -7,7 +7,7 @@ vi.mock('./themes.js', async importOriginal => {
 });
 
 const { api } = await import('./spotify.js');
-const { buildTracks, getThemeCounts, loadThemePool } = await import('./tracks.js');
+const { buildTracks, getThemePools, loadThemePool } = await import('./tracks.js');
 const { getToast } = await import('./toast.js');
 
 const testThemes = {};
@@ -148,7 +148,7 @@ describe('loadThemePool — cas limites', () => {
     mockPlaylists(playlists);
     const theme = makeTheme(playlists);
     await loadThemePool(theme);
-    expect(getThemeCounts()[theme.id]).toBe(2);
+    expect(getThemePools()[theme.id]).toHaveLength(2);
   });
 
   it('réutilise le cache pour un thème déjà chargé', async () => {
@@ -179,5 +179,70 @@ describe('buildTracks — cas limites', () => {
     expect(tracks).toEqual([]);
     expect(getToast().msg).toMatch(new RegExp(`${theme.label}.*vide ou inaccessible`));
     expect(onProgress).toHaveBeenCalledWith(`🎵 Chargement : ${theme.label}…`, 40);
+  });
+});
+
+describe('chansons enregistrées', () => {
+  it('convertit un son Spotify pour l\'enregistrer', async () => {
+    const { toTrackInput } = await import('./tracks.js');
+    const t = { uri: 'spotify:track:x', name: 'Titre', artists: [{ name: 'A' }, { name: 'B' }], album: { images: [{ url: 'https://i.scdn.co/1' }] }, _themeId: '80s' };
+    expect(toTrackInput(t)).toEqual({ uri: 'spotify:track:x', name: 'Titre', artists: ['A', 'B'], albumImage: 'https://i.scdn.co/1', themeId: '80s', fromReview: false });
+    expect(toTrackInput({ ...t, album: { images: [] }, _fromReview: true })).toMatchObject({ albumImage: null, fromReview: true });
+    expect(toTrackInput({ ...t, album: undefined }).albumImage).toBeNull();
+  });
+});
+
+describe('availableCount', () => {
+  it('retire les exclus mais garde les sons à revoir', async () => {
+    const { availableCount } = await import('./tracks.js');
+    const pool = [track('A'), track('B'), track('C')];
+    const excluded = new Set([pool[0].uri, pool[1].uri]);
+    const review = [
+      { uri: pool[1].uri, themeId: 'x' },
+      { uri: 'spotify:track:ailleurs', themeId: 'x' },
+      { uri: 'spotify:track:autre-theme', themeId: 'y' },
+    ];
+    expect(availableCount('x', pool, excluded, review)).toBe(3);
+    expect(availableCount('x', pool, new Set(), [])).toBe(3);
+  });
+});
+
+describe('buildTracks — exclusion et chansons à revoir', () => {
+  const reviewItem = (name, themeId, over = {}) => ({
+    uri: `spotify:track:${name}`, name, artists: ['R'], albumImage: 'https://i.scdn.co/r', themeId, ...over,
+  });
+
+  it('évite les sons de la partie précédente', async () => {
+    const playlists = { p1: [track('Vu'), track('Neuf 1'), track('Neuf 2')] };
+    mockPlaylists(playlists);
+    const theme = makeTheme(playlists);
+    const tracks = await buildTracks([theme.id], 3, () => {}, { excluded: new Set([track('Vu').uri]) });
+    expect(tracks.map(t => t.name).sort()).toEqual(['Neuf 1', 'Neuf 2']);
+  });
+
+  it('place au plus la moitié du quota en sons à revoir, même exclus, jamais pour un thème non choisi', async () => {
+    const playlists = { p1: Array.from({ length: 10 }, (_, i) => track(`Son ${i}`)) };
+    mockPlaylists(playlists);
+    const theme = makeTheme(playlists);
+    const review = [
+      reviewItem('Son 0', theme.id, { uri: track('Son 0').uri }),
+      reviewItem('Rev A', theme.id), reviewItem('Rev B', theme.id), reviewItem('Rev C', theme.id),
+      reviewItem('Autre', 'theme-non-choisi'),
+    ];
+    const tracks = await buildTracks([theme.id], 5, () => {}, { excluded: new Set([track('Son 0').uri]), review });
+    const fromReview = tracks.filter(t => t._fromReview);
+    expect(tracks).toHaveLength(5);
+    expect(fromReview).toHaveLength(3);
+    expect(tracks.some(t => t.name === 'Autre')).toBe(false);
+    const rebuilt = fromReview.find(t => t.name.startsWith('Rev'));
+    expect(rebuilt).toMatchObject({ artists: [{ name: 'R' }], album: { images: [{ url: 'https://i.scdn.co/r' }] }, _themeId: theme.id });
+  });
+
+  it('reprend une chanson à revoir sans pochette', async () => {
+    const playlists = { p1: [track('A')] };
+    mockPlaylists(playlists);
+    const theme = makeTheme(playlists);
+    const tracks = await buildTracks([theme.id], 2, () => {}, { review: [reviewItem('Seule', theme.id, { albumImage: null })] });
+    expect(tracks.find(t => t.name === 'Seule').album.images).toEqual([]);
   });
 });

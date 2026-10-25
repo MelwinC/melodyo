@@ -519,3 +519,11 @@ input[type="range"] {
 .avatar-choice[aria-pressed="true"] { border-color: var(--green); }
 .upload-label { cursor: pointer; }
 @media (max-width: 420px) { .avatar-grid { grid-template-columns: repeat(4, 1fr); } }
+
+/* ── OPTIONS DE PARTIE ── */
+.segmented { display: flex; gap: 6px; background: var(--surface); border-radius: 50px; padding: 4px; }
+.segmented button {
+  flex: 1; border: none; border-radius: 50px; padding: 9px; cursor: pointer;
+  background: transparent; color: var(--text2); font-weight: 600; font-size: 13px;
+}
+.segmented button[aria-checked="true"] { background: var(--green); color: #000; }

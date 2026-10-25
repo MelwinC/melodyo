@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { THEMES, findTheme, sliderBounds } from '../lib/themes.js';
-import { buildTracks, getThemeCounts, loadThemePool } from '../lib/tracks.js';
+import { createGame, fetchExclusions, fetchReview } from '../lib/games.js';
+import { availableCount, buildTracks, getThemePools, loadThemePool, toTrackInput } from '../lib/tracks.js';
 import { activate, disconnect, ensurePlayer, isFirefox } from '../lib/player.js';
 import { logout } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
@@ -14,30 +15,63 @@ function countLabel(count) {
   return '';
 }
 
+// Groupe de choix exclusifs (boutons radio)
+function Choice({ label, value, options, onChange }) {
+  return (
+    <div className="form-group">
+      <label>{label}</label>
+      <div className="segmented" role="radiogroup" aria-label={label}>
+        {options.map(([v, text]) => (
+          <button key={v} type="button" role="radio" aria-checked={value === v} onClick={() => onChange(v)}>{text}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Create({ user, onStart, onProfile }) {
   const [selected, setSelected] = useState([]);
-  const [counts, setCounts] = useState(getThemeCounts);
+  const [pools, setPools] = useState(getThemePools);
+  const [context, setContext] = useState(null);
   const [perTheme, setPerTheme] = useState(5);
+  const [timer, setTimer] = useState('full');
+  const [start, setStart] = useState('start');
   const [progress, setProgress] = useState(null);
 
   // Lancer la connexion SDK dès l'affichage de l'écran pour éviter le délai au lancement
   useEffect(() => { ensurePlayer().catch(() => {}); }, []);
 
+  // Sons de la partie précédente (exclus) et liste « à revoir » du compte
+  useEffect(() => {
+    Promise.all([fetchExclusions(), fetchReview()])
+      .then(([excluded, review]) => setContext({ excluded, review }))
+      .catch(() => {
+        toast('Historique indisponible : la partie précédente ne sera pas exclue');
+        setContext({ excluded: new Set(), review: [] });
+      });
+  }, []);
+
   function toggleTheme(theme) {
     const willSelect = !selected.includes(theme.id);
     setSelected(s => willSelect ? [...s, theme.id] : s.filter(id => id !== theme.id));
-    if (!willSelect || typeof counts[theme.id] === 'number' || counts[theme.id] === 'loading') return;
+    if (!willSelect || Array.isArray(pools[theme.id]) || pools[theme.id] === 'loading') return;
 
-    // Compte les sons disponibles du thème (une seule fois, mis en cache)
-    setCounts(c => ({ ...c, [theme.id]: 'loading' }));
+    // Charge les sons du thème (une seule fois, mis en cache)
+    setPools(p => ({ ...p, [theme.id]: 'loading' }));
     loadThemePool(theme)
-      .then(pool => setCounts(c => ({ ...c, [theme.id]: pool.length })))
+      .then(pool => setPools(p => ({ ...p, [theme.id]: pool })))
       .catch(e => {
         toast(`⚠️ ${theme.label} : ${e.message}`);
-        setCounts(c => ({ ...c, [theme.id]: 'error' }));
+        setPools(p => ({ ...p, [theme.id]: 'error' }));
         setSelected(s => s.filter(id => id !== theme.id));
       });
   }
+
+  // Nombre de sons jouables par thème, une fois connues l'exclusion et la liste « à revoir »
+  const counts = Object.fromEntries(Object.entries(pools).map(([id, pool]) => [
+    id,
+    !Array.isArray(pool) ? pool : context ? availableCount(id, pool, context.excluded, context.review) : 'loading',
+  ]));
 
   const { min, max, limitedBy, pending } = sliderBounds(selected, counts);
   const value = Math.max(min, Math.min(perTheme, max));
@@ -49,10 +83,13 @@ export default function Create({ user, onStart, onProfile }) {
     activate();
     setProgress({ label: 'Démarrage…', pct: 0 });
     try {
-      const tracks = await buildTracks(selected, value, (label, pct) => setProgress({ label, pct }));
+      const tracks = await buildTracks(selected, value, (label, pct) => setProgress({ label, pct }), context);
       if (!tracks.length) throw new Error('Aucun son trouvé pour ces thèmes.');
       setProgress({ label: 'Lancement…', pct: 95 });
-      onStart(tracks, selected.map(id => findTheme(id).emoji).join(' '));
+      const gameId = await createGame({ themes: selected, perTheme: value, timer, start }, tracks.map(toTrackInput));
+      onStart(tracks, selected.map(id => findTheme(id).emoji).join(' '), {
+        gameId, timer, start, reviewUris: new Set(context.review.map(r => r.uri)),
+      });
     } catch (e) {
       toast('Erreur : ' + e.message);
       setProgress(null);
@@ -107,6 +144,10 @@ export default function Create({ user, onStart, onProfile }) {
             </div>
           </div>
         </div>
+        <Choice label="Durée" value={timer} onChange={setTimer}
+          options={[['full', 'Chanson entière'], ['30s', 'Extrait 30 s']]} />
+        <Choice label="Départ" value={start} onChange={setStart}
+          options={[['start', 'Début'], ['middle', 'Milieu']]} />
         <button className="btn btn-green btn-full" disabled={!selected.length || pending || !!progress} onClick={doCreate}>
           ▶ Lancer la partie
         </button>

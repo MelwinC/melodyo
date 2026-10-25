@@ -53,9 +53,9 @@ async function fetchPlaylistTracks(playlistId) {
 
 // Sons disponibles par thème (lisibles, sans doublon d'URI ni de titre), mis en cache
 const themePools = {};
-const themeCounts = {};
+const loadedPools = {};
 
-export const getThemeCounts = () => ({ ...themeCounts });
+export const getThemePools = () => ({ ...loadedPools });
 
 export function loadThemePool(theme) {
   if (!themePools[theme.id]) {
@@ -74,7 +74,7 @@ export function loadThemePool(theme) {
       }).map(t => ({ ...t, _themeId: theme.id, _themeLabel: theme.label }));
       if (!pool.length) throw new Error(`Playlist vide ou inaccessible pour : ${theme.label}`);
       console.log(`[fetch] ${theme.label} — ${pool.length} sons disponibles`);
-      themeCounts[theme.id] = pool.length;
+      loadedPools[theme.id] = pool;
       return pool;
     })().catch(e => { delete themePools[theme.id]; throw e; });
   }
@@ -87,7 +87,38 @@ function popularFirst(pool) {
   return shuffle(pool).sort((a, b) => tier(a) - tier(b));
 }
 
-export async function buildTracks(themeIds, perTheme, onProgress) {
+// Format enregistré en base pour l'historique et la liste « à revoir »
+export function toTrackInput(t) {
+  return {
+    uri: t.uri,
+    name: t.name,
+    artists: t.artists.map(a => a.name),
+    albumImage: t.album?.images?.[0]?.url ?? null,
+    themeId: t._themeId,
+    fromReview: Boolean(t._fromReview),
+  };
+}
+
+// Sons jouables d'un thème : le pool sans la partie précédente, plus les sons « à revoir » du thème
+export function availableCount(themeId, pool, excluded, review) {
+  const inPool = new Set(pool.map(t => t.uri));
+  const toReview = new Set(review.filter(r => r.themeId === themeId).map(r => r.uri));
+  const fromPool = pool.filter(t => !excluded.has(t.uri) || toReview.has(t.uri)).length;
+  return fromPool + [...toReview].filter(uri => !inPool.has(uri)).length;
+}
+
+// Son « à revoir » remis au format du lecteur (il peut ne plus être dans la playlist)
+const reviewToTrack = (r, theme) => ({
+  uri: r.uri,
+  name: r.name,
+  artists: r.artists.map(name => ({ name })),
+  album: { images: r.albumImage ? [{ url: r.albumImage }] : [] },
+  _themeId: theme.id,
+  _themeLabel: theme.label,
+  _fromReview: true,
+});
+
+export async function buildTracks(themeIds, perTheme, onProgress, { excluded = new Set(), review = [] } = {}) {
   console.log(`[build] thèmes : ${themeIds.join(', ')} — ${perTheme} sons/thème`);
   const all = [];
   const usedTitles = new Set();
@@ -97,16 +128,23 @@ export async function buildTracks(themeIds, perTheme, onProgress) {
     onProgress(`${theme.emoji} Chargement : ${theme.label}…`, Math.round((i / themeIds.length) * 80));
     try {
       const pool = await loadThemePool(theme);
+      // Sons « à revoir » d'abord (au plus la moitié du quota), puis des sons neufs
+      const reviewPicks = shuffle(review.filter(r => r.themeId === theme.id))
+        .slice(0, Math.ceil(perTheme / 2))
+        .map(r => reviewToTrack(r, theme));
+      const picked = new Set(reviewPicks.map(t => t.uri));
+      const fresh = popularFirst(pool.filter(t => !excluded.has(t.uri) && !picked.has(t.uri)));
+
       // Un même titre peut apparaître dans deux thèmes : on le garde pour le premier
       const kept = [];
-      for (const t of popularFirst(pool)) {
+      for (const t of [...reviewPicks, ...fresh]) {
         if (kept.length >= perTheme) break;
         const key = normalizeTitle(t.name);
         if (usedTitles.has(key)) continue;
         usedTitles.add(key);
         kept.push(t);
       }
-      if (kept.length < perTheme) console.warn(`[build] ${theme.label} — seulement ${kept.length}/${perTheme} sons (doublons avec d'autres thèmes)`);
+      if (kept.length < perTheme) console.warn(`[build] ${theme.label} — seulement ${kept.length}/${perTheme} sons`);
       console.log(`[build] ${theme.label} → ${kept.length} sons`);
       all.push(...kept);
     } catch (e) {
