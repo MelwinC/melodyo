@@ -30,7 +30,7 @@ function Choice({ label, value, options, onChange }) {
   );
 }
 
-export default function Create({ user, onStart, onProfile, onHistory, onReview, room, roomState, onCloseRoom }) {
+export default function Create({ user, onStart, onProfile, onHistory, onReview, onJoin, room, roomState, onCloseRoom }) {
   const [selected, setSelected] = useState([]);
   const [pools, setPools] = useState(getThemePools);
   const [context, setContext] = useState(null);
@@ -111,6 +111,7 @@ export default function Create({ user, onStart, onProfile, onHistory, onReview, 
       <div className="home-links">
         <button className="btn btn-ghost btn-sm" onClick={onHistory}>📜 Historique</button>
         <button className="btn btn-ghost btn-sm" onClick={onReview}>⭐ À revoir</button>
+        <button className="btn btn-ghost btn-sm" onClick={onJoin}>🎮 Rejoindre</button>
       </div>
       {isFirefox && (
         <div className="browser-warning">

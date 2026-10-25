@@ -109,3 +109,10 @@ export async function getRoomGame(pool, roomId, gameId) {
   );
   return rows[0] ?? null;
 }
+
+// Participant d'un appareil : son compte d'abord, sinon son cookie d'invité (un compte peut aussi jouer en invité)
+export async function findParticipantFor(pool, roomId, { userId, guestToken }) {
+  const byAccount = userId ? await findParticipant(pool, roomId, { userId }) : null;
+  if (byAccount || !guestToken) return byAccount;
+  return findParticipant(pool, roomId, { guestToken });
+}

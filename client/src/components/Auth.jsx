@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { login, messageFor, register } from '../lib/session.js';
 
-export default function Auth() {
+export default function Auth({ onJoin }) {
   const [mode, setMode] = useState('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -49,6 +49,7 @@ export default function Auth() {
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="btn btn-green btn-full" disabled={busy}>{creating ? 'Créer mon compte' : 'Se connecter'}</button>
         </form>
+        <button type="button" className="btn btn-ghost btn-full link-logout" onClick={onJoin}>🎮 Rejoindre une partie</button>
       </div>
     </div>
   );

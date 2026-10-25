@@ -563,3 +563,16 @@ input[type="range"] {
 }
 .participants li.offline { opacity: .45; }
 .round-status { display: flex; gap: 16px; justify-content: center; color: var(--text2); font-size: 13px; font-weight: 600; }
+
+/* ── PARTICIPANT ── */
+.room-code-input { text-transform: uppercase; letter-spacing: 4px; font-size: 22px; text-align: center; }
+.join-room { text-align: center; color: var(--text2); }
+.seat-name { font-size: 13px; color: var(--text2); max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reconnecting { background: var(--surface2); border-radius: var(--radius); padding: 10px 14px; font-size: 13px; margin-bottom: 16px; text-align: center; }
+.answer-card { background: var(--surface); border-radius: var(--radius); padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.answer-card label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text2); }
+.answer-head { display: flex; justify-content: space-between; font-weight: 700; }
+.answer-timer { color: var(--green); font-variant-numeric: tabular-nums; font-size: 20px; }
+.answer-locked { color: var(--danger); font-weight: 600; font-size: 14px; }
+.answer-saved { color: var(--green); font-size: 13px; }
+.join-code { text-align: center; }

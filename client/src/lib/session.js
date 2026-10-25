@@ -67,6 +67,8 @@ const MESSAGES = {
   invalid_image: 'Image illisible (PNG, JPEG ou WebP)',
   unsupported_type: 'Format non supporté (PNG, JPEG ou WebP)',
   'entity.too.large': 'Image trop lourde (2 Mo max)',
+  room_not_found: 'Room introuvable',
+  invalid_name: 'Nom : 1 à 20 caractères',
 };
 
 export const messageFor = code => MESSAGES[code] ?? 'Une erreur est survenue';

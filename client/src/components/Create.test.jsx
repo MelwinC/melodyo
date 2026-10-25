@@ -227,6 +227,13 @@ describe('Create', () => {
     expect(onReview).toHaveBeenCalled();
   });
 
+  it('propose de rejoindre une partie', async () => {
+    const onJoin = vi.fn();
+    render(<Create user={user} onProfile={vi.fn()} onStart={vi.fn()} onJoin={onJoin} />);
+    await userEvent.click(screen.getByRole('button', { name: '🎮 Rejoindre' }));
+    expect(onJoin).toHaveBeenCalled();
+  });
+
   it('affiche le salon de la room et y rattache la partie', async () => {
     getThemePools.mockReturnValue({ '80s': pool(120) });
     buildTracks.mockResolvedValue(pool(5));

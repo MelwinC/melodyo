@@ -2,7 +2,7 @@ import { parseCookie } from 'cookie';
 import { WebSocketServer } from 'ws';
 import { z } from 'zod';
 import { normalizeRoomCode } from './rooms/code.js';
-import { findOpenRoomByCode, findParticipant } from './rooms/repo.js';
+import { findOpenRoomByCode, findParticipantFor } from './rooms/repo.js';
 import { guestCookieName } from './routes/rooms.js';
 import { findSessionUserId, SESSION_COOKIE } from './sessions.js';
 
@@ -52,10 +52,7 @@ export function attachWebSocket(httpServer, { pool, hub, pingMs = 30_000 }) {
     const userId = sessionToken ? await findSessionUserId(pool, sessionToken) : null;
 
     if (hello.role === 'host') return room.hostId === userId ? { room, role: 'host' } : null;
-    // Un compte peut aussi avoir rejoint en invité (avec un nom) : on essaie le compte puis le cookie d'invité
-    let participant = userId ? await findParticipant(pool, room.id, { userId }) : null;
-    const guestToken = cookies[guestCookieName(code)];
-    if (!participant && guestToken) participant = await findParticipant(pool, room.id, { guestToken });
+    const participant = await findParticipantFor(pool, room.id, { userId, guestToken: cookies[guestCookieName(code)] });
     return participant ? { room, role: 'player', participantId: participant.id } : null;
   }
 

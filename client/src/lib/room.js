@@ -5,6 +5,16 @@ import { request } from './http.js';
 export const openRoom = async () => (await request('POST', '/api/rooms')).room;
 export const closeRoom = () => request('POST', '/api/rooms/close');
 export const getRoomInfo = async code => (await request('GET', `/api/rooms/${encodeURIComponent(code)}`)).room;
+// null si l'appareil n'a pas encore rejoint la room
+export async function myParticipant(code) {
+  try {
+    return (await request('GET', `/api/rooms/${encodeURIComponent(code)}/me`)).participant;
+  } catch (err) {
+    if (err.code === 'not_joined') return null;
+    throw err;
+  }
+}
+
 export const joinRoom = async (code, guestName) =>
   (await request('POST', `/api/rooms/${code}/join`, guestName === undefined ? {} : { guestName })).participant;
 

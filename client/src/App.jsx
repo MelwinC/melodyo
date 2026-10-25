@@ -6,6 +6,7 @@ import { getSession, loadSession, subscribeSession } from './lib/session.js';
 import { toast } from './lib/toast.js';
 import Auth from './components/Auth.jsx';
 import Create from './components/Create.jsx';
+import Join from './components/Join.jsx';
 import GameDetail from './components/GameDetail.jsx';
 import History from './components/History.jsx';
 import LinkSpotify from './components/LinkSpotify.jsx';
@@ -28,12 +29,19 @@ function showUrlError() {
   history.replaceState({}, '', '/');
 }
 
+// Lien d'invitation /r/CODE : l'appareil rejoint la room comme participant
+function joinCodeFromUrl() {
+  const match = location.pathname.match(/^\/r\/([^/]*)$/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 export default function App() {
   const session = useSyncExternalStore(subscribeSession, getSession);
   const [screen, setScreen] = useState({ name: 'create' });
+  const [join, setJoin] = useState(joinCodeFromUrl);
   // Partie et chanson en cours, renvoyées au serveur si la connexion temps réel se rétablit
   const live = useRef({ gameId: null, round: null });
-  const host = useHostRoom(session.user, true, () => {
+  const host = useHostRoom(session.user, join === null, () => {
     const { gameId, round } = live.current;
     if (!gameId) return;
     sendRoom({ type: 'game:start', gameId });
@@ -81,13 +89,23 @@ export default function App() {
   }
 
   const toCreate = () => setScreen({ name: 'create' });
+  const openJoin = () => {
+    history.pushState({}, '', '/r/');
+    setJoin('');
+  };
+  const leaveJoin = () => {
+    history.pushState({}, '', '/');
+    setJoin(null);
+  };
   let content;
   if (session.status === 'loading') {
     content = <div className="player-loading"><div className="player-loading-spinner"></div></div>;
+  } else if (join !== null) {
+    content = <Join code={join} user={session.user} onLeave={leaveJoin} />;
   } else if (session.status === 'anonymous') {
-    content = <Auth />;
+    content = <Auth onJoin={openJoin} />;
   } else if (!session.user.spotifyLinked) {
-    content = <LinkSpotify user={session.user} />;
+    content = <LinkSpotify user={session.user} onJoin={openJoin} />;
   } else if (screen.name === 'profile') {
     content = <Profile user={session.user} onBack={toCreate} />;
   } else if (screen.name === 'player') {
@@ -102,7 +120,7 @@ export default function App() {
     content = (
       <Create user={session.user} onStart={startGame} onProfile={() => setScreen({ name: 'profile' })}
         room={host.room} roomState={host.live.state} onCloseRoom={host.close}
-        onHistory={() => setScreen({ name: 'history' })} onReview={() => setScreen({ name: 'review' })} />
+        onHistory={() => setScreen({ name: 'history' })} onReview={() => setScreen({ name: 'review' })} onJoin={openJoin} />
     );
   }
 

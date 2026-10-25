@@ -126,9 +126,20 @@ describe('API des rooms', () => {
     ['getRoomInfo', ['ab c'], 'GET', '/api/rooms/ab%20c', undefined, { room: { code: 'ABC' } }, { code: 'ABC' }],
     ['joinRoom', ['ABC', 'Moi'], 'POST', '/api/rooms/ABC/join', { guestName: 'Moi' }, { participant: { id: 'p' } }, { id: 'p' }],
     ['joinRoom', ['ABC'], 'POST', '/api/rooms/ABC/join', {}, { participant: { id: 'p' } }, { id: 'p' }],
+    ['myParticipant', ['ab c'], 'GET', '/api/rooms/ab%20c/me', undefined, { participant: { id: 'p' } }, { id: 'p' }],
   ])('%s', async (fn, args, method, path, body, response, expected) => {
     request.mockResolvedValue(response);
     expect(await room[fn](...args)).toEqual(expected);
     expect(request).toHaveBeenCalledWith(...[method, path, body].filter(x => x !== undefined));
+  });
+});
+
+describe('myParticipant', () => {
+  it('renvoie null si l\'appareil n\'a pas encore rejoint', async () => {
+    const { ApiError } = await vi.importActual('./http.js');
+    request.mockRejectedValue(new ApiError(404, 'not_joined'));
+    expect(await room.myParticipant('ABC234')).toBeNull();
+    request.mockRejectedValue(new ApiError(404, 'room_not_found'));
+    await expect(room.myParticipant('ABC234')).rejects.toMatchObject({ code: 'room_not_found' });
   });
 });

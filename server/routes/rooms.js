@@ -1,7 +1,8 @@
+import { parseCookie } from 'cookie';
 import express from 'express';
 import { asyncRoute } from '../async-route.js';
 import { normalizeRoomCode } from '../rooms/code.js';
-import { closeRoom, findOpenRoomByCode, joinAsGuest, joinAsUser, openRoomFor } from '../rooms/repo.js';
+import { closeRoom, findOpenRoomByCode, findParticipantFor, joinAsGuest, joinAsUser, openRoomFor } from '../rooms/repo.js';
 import { requireUser } from '../session-middleware.js';
 
 const GUEST_DAYS = 7;
@@ -32,6 +33,16 @@ export function roomsRouter({ pool, config, limiters, hub }) {
     const room = await roomFromParam(req);
     if (!room) return roomNotFound(res);
     res.json({ room: { code: room.code, hostName: room.hostName } });
+  }));
+
+  // Reprise après rechargement : le cookie d'invité n'est pas lisible par la page, le serveur le reconnaît
+  router.get('/api/rooms/:code/me', asyncRoute(async (req, res) => {
+    const room = await roomFromParam(req);
+    if (!room) return roomNotFound(res);
+    const guestToken = parseCookie(req.headers.cookie ?? '')[guestCookieName(room.code)];
+    const participant = await findParticipantFor(pool, room.id, { userId: req.user?.id, guestToken });
+    if (!participant) return res.status(404).json({ error: 'not_joined' });
+    res.json({ participant });
   }));
 
   // Un compte connecté rejoint avec son compte, sauf s'il donne un nom (il joue alors en invité)

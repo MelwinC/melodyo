@@ -107,3 +107,31 @@ describe('POST /api/rooms/:code/join', () => {
     expect((await request(limited).post('/api/rooms/ZZZZZZ/join').send({ guestName: 'A' })).status).toBe(429);
   });
 });
+
+describe('GET /api/rooms/:code/me', () => {
+  it('retrouve l\'invité grâce à son cookie', async () => {
+    const { room } = await hostWithRoom();
+    const guest = request.agent(app);
+    const { participant } = (await guest.post(`/api/rooms/${room.code}/join`).send({ guestName: 'Retour' })).body;
+    expect((await guest.get(`/api/rooms/${room.code.toLowerCase()}/me`)).body).toEqual({ participant });
+  });
+
+  it('retrouve un compte qui a rejoint, ou qui a rejoint en invité', async () => {
+    const { room } = await hostWithRoom();
+    const player = request.agent(app);
+    await signUp(player);
+    expect((await player.get(`/api/rooms/${room.code}/me`)).status).toBe(404);
+    const { participant } = (await player.post(`/api/rooms/${room.code}/join`).send({ guestName: 'Équipe' })).body;
+    expect((await player.get(`/api/rooms/${room.code}/me`)).body.participant.id).toBe(participant.id);
+    const joined = (await player.post(`/api/rooms/${room.code}/join`).send({})).body.participant;
+    expect((await player.get(`/api/rooms/${room.code}/me`)).body.participant.id).toBe(joined.id);
+  });
+
+  it('répond not_joined sans participation et room_not_found pour une room inconnue', async () => {
+    const { room } = await hostWithRoom();
+    const res = await request(app).get(`/api/rooms/${room.code}/me`);
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'not_joined' });
+    expect((await request(app).get('/api/rooms/ZZZZZZ/me')).body).toEqual({ error: 'room_not_found' });
+  });
+});

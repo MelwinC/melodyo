@@ -19,16 +19,17 @@ vi.mock('./lib/player.js', () => ({ ensurePlayer: vi.fn(), pause: vi.fn(), start
 vi.mock('./lib/games.js', () => ({ markPlayed: vi.fn(), endGame: vi.fn() }));
 const host = vi.hoisted(() => ({ value: null }));
 vi.mock('./lib/room.js', () => ({ sendRoom: vi.fn() }));
-vi.mock('./components/useHostRoom.js', () => ({ useHostRoom: (user, enabled, onReconnect) => { host.onReconnect = onReconnect; return host.value; } }));
+vi.mock('./components/useHostRoom.js', () => ({ useHostRoom: (user, enabled, onReconnect) => { host.onReconnect = onReconnect; host.enabled = enabled; return host.value; } }));
+vi.mock('./components/Join.jsx', () => ({ default: ({ code, user, onLeave }) => <button onClick={onLeave}>rejoindre [{code}] {user?.username ?? 'invité'}</button> }));
 vi.mock('./components/History.jsx', () => ({ default: ({ onOpen, onBack }) => <div><button onClick={() => onOpen('g9')}>ouvrir g9</button><button onClick={onBack}>retour historique</button></div> }));
 vi.mock('./components/GameDetail.jsx', () => ({ default: ({ gameId, onBack }) => <button onClick={onBack}>détail {gameId}</button> }));
 vi.mock('./components/ReviewList.jsx', () => ({ default: ({ onBack }) => <button onClick={onBack}>liste à revoir</button> }));
 vi.mock('./lib/toast.js', async importOriginal => ({ ...(await importOriginal()), toast: vi.fn() }));
-vi.mock('./components/Auth.jsx', () => ({ default: () => <p>écran connexion</p> }));
-vi.mock('./components/LinkSpotify.jsx', () => ({ default: ({ user }) => <p>relier spotify {user.username}</p> }));
+vi.mock('./components/Auth.jsx', () => ({ default: ({ onJoin }) => <button onClick={onJoin}>écran connexion</button> }));
+vi.mock('./components/LinkSpotify.jsx', () => ({ default: ({ user, onJoin }) => <button onClick={onJoin}>relier spotify {user.username}</button> }));
 vi.mock('./components/Profile.jsx', () => ({ default: ({ onBack }) => <button onClick={onBack}>écran profil</button> }));
 vi.mock('./components/Create.jsx', () => ({
-  default: ({ user, onStart, onProfile, onHistory, onReview, room, roomState, onCloseRoom }) => (
+  default: ({ user, onStart, onProfile, onHistory, onReview, onJoin, room, roomState, onCloseRoom }) => (
     <div>
       <p>room {room?.code} {roomState?.participants?.length}</p>
       <button onClick={onCloseRoom}>fermer room</button>
@@ -36,6 +37,7 @@ vi.mock('./components/Create.jsx', () => ({
       <button onClick={onProfile}>profil</button>
       <button onClick={onHistory}>historique</button>
       <button onClick={onReview}>à revoir</button>
+      <button onClick={onJoin}>rejoindre une partie</button>
     </div>
   ),
 }));
@@ -194,5 +196,40 @@ describe('App', () => {
     sendRoom.mockClear();
     host.onReconnect();
     expect(sendRoom.mock.calls).toEqual([[{ type: 'game:start', gameId: 'g1' }]]);
+  });
+
+  it('ouvre l\'écran pour rejoindre depuis un lien /r/CODE, sans ouvrir de room créateur', () => {
+    history.replaceState({}, '', '/r/ABC234');
+    store.snapshot = { status: 'ready', user };
+    render(<App />);
+    expect(screen.getByText('rejoindre [ABC234] Mel')).toBeInTheDocument();
+    expect(host.enabled).toBe(false);
+  });
+
+  it('fait rejoindre un invité sans session puis revient à l\'accueil', async () => {
+    history.replaceState({}, '', '/r/abc%20234');
+    store.snapshot = { status: 'anonymous', user: null };
+    render(<App />);
+    await userEvent.click(screen.getByText('rejoindre [abc 234] invité'));
+    expect(location.pathname).toBe('/');
+    expect(screen.getByText('écran connexion')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['la connexion', { status: 'anonymous', user: null }, 'écran connexion'],
+    ['la liaison Spotify', { status: 'ready', user: { ...user, spotifyLinked: false } }, 'relier spotify Mel'],
+    ['la création', { status: 'ready', user }, 'rejoindre une partie'],
+  ])('propose de rejoindre une partie depuis %s', async (_, snapshot, button) => {
+    store.snapshot = snapshot;
+    render(<App />);
+    await userEvent.click(screen.getByText(button));
+    expect(location.pathname).toBe('/r/');
+    expect(screen.getByText(/rejoindre \[\]/)).toBeInTheDocument();
+  });
+
+  it('attend la session avant d\'afficher l\'écran pour rejoindre', () => {
+    history.replaceState({}, '', '/r/ABC234');
+    const { container } = render(<App />);
+    expect(container.querySelector('.player-loading-spinner')).toBeInTheDocument();
   });
 });

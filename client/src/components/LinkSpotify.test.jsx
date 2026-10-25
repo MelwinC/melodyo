@@ -22,4 +22,11 @@ describe('LinkSpotify', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Se déconnecter' }));
     expect(logout).toHaveBeenCalled();
   });
+
+  it('propose de rejoindre une partie', async () => {
+    const onJoin = vi.fn();
+    render(<LinkSpotify user={user} onJoin={onJoin} />);
+    await userEvent.click(screen.getByRole('button', { name: '🎮 Rejoindre une partie' }));
+    expect(onJoin).toHaveBeenCalled();
+  });
 });
