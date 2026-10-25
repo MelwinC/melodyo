@@ -1,6 +1,8 @@
 import express from 'express';
+import { asyncRoute } from '../async-route.js';
+import { requireUser } from '../session-middleware.js';
+import { getAccessToken, sendTokenError } from '../spotify-auth.js';
 
-// Relaie les appels de l'app vers l'API Spotify pour journaliser les erreurs côté serveur
 function isJson(text) {
   try {
     JSON.parse(text);
@@ -10,12 +12,18 @@ function isJson(text) {
   }
 }
 
-export function spotifyProxyRouter({ timeoutMs = 10_000 } = {}) {
+// Relaie les appels de l'app vers l'API Spotify avec le token stocké du compte connecté
+export function spotifyProxyRouter({ pool, config }) {
   const router = express.Router();
+  const timeoutMs = config.spotifyTimeoutMs;
 
-  router.all('/spotify/*', async (req, res) => {
-    const token = req.headers['x-token'];
-    if (!token) return res.status(401).json({ error: 'missing_token' });
+  router.all('/spotify/*', requireUser, asyncRoute(async (req, res) => {
+    let accessToken;
+    try {
+      ({ accessToken } = await getAccessToken(pool, config, req.user.id, { timeoutMs }));
+    } catch (err) {
+      return sendTokenError(res, err);
+    }
 
     const spotifyPath = req.originalUrl.replace(/^\/spotify/, '');
     const hasBody = ['POST', 'PUT', 'PATCH'].includes(req.method);
@@ -23,7 +31,7 @@ export function spotifyProxyRouter({ timeoutMs = 10_000 } = {}) {
     try {
       const response = await fetch(`https://api.spotify.com/v1${spotifyPath}`, {
         method: req.method,
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: hasBody ? JSON.stringify(req.body) : undefined,
         signal: AbortSignal.timeout(timeoutMs),
       });
@@ -40,7 +48,7 @@ export function spotifyProxyRouter({ timeoutMs = 10_000 } = {}) {
       console.error('[Proxy Error]', err.message);
       res.status(502).json({ error: err.message });
     }
-  });
+  }));
 
   return router;
 }

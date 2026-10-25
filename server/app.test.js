@@ -5,7 +5,7 @@ import { loadConfig } from './config.js';
 
 const headersFor = async argv => {
   const env = { DATABASE_URL: 'postgres://x', TOKEN_ENCRYPTION_KEY: 'ab'.repeat(32) };
-  const res = await request(createApp({ config: loadConfig(env, argv), pool: null })).get('/login');
+  const res = await request(createApp({ config: loadConfig(env, argv), pool: null })).get('/api/me');
   return res.headers;
 };
 

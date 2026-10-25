@@ -14,6 +14,7 @@ describe('loadConfig', () => {
       avatarDir: path.resolve(import.meta.dirname, '..', '.data', 'avatars'),
       tokenKey: '0'.repeat(64),
       trustProxy: 0,
+      spotifyTimeoutMs: 10_000,
     });
   });
 
@@ -26,7 +27,7 @@ describe('loadConfig', () => {
     expect(loadConfig(env, ['--prod'])).toEqual({
       prod: true, host: '0.0.0.0', port: 9000, spotifyClientId: 'cid',
       redirectUri: 'https://x/callback', databaseUrl: 'postgres://db/x',
-      avatarDir: '/data/avatars', tokenKey: 'ab'.repeat(32), trustProxy: 2,
+      avatarDir: '/data/avatars', tokenKey: 'ab'.repeat(32), trustProxy: 2, spotifyTimeoutMs: 10_000,
     });
   });
 

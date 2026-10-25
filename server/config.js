@@ -27,5 +27,6 @@ export function loadConfig(env = process.env, argv = process.argv) {
     avatarDir: env.AVATAR_DIR || path.join(ROOT, '.data', 'avatars'),
     tokenKey: key,
     trustProxy: Number(env.TRUST_PROXY) || 0,
+    spotifyTimeoutMs: 10_000,
   };
 }
