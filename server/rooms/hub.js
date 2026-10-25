@@ -3,6 +3,8 @@ import { getAnswers, getRoomGame, listParticipants, saveAnswer } from './repo.js
 
 // En mode extrait, les équipes ont 1 min 30 pour répondre ; sinon toute la durée de lecture
 const EXTRACT_ANSWER_MS = 90_000;
+// Une room sans aucune connexion depuis 2 h est retirée de la mémoire (ses données restent en base)
+const IDLE_MS = 2 * 3600 * 1000;
 
 // État des rooms en mémoire : le serveur décide seul de l'ouverture et de la fermeture des manches.
 // Les participants ne reçoivent jamais d'information sur les chansons.
@@ -10,7 +12,7 @@ export function createHub({ pool, now = Date.now, setTimer = setTimeout, clearTi
   const rooms = new Map();
 
   function roomOf(roomId) {
-    if (!rooms.has(roomId)) rooms.set(roomId, { conns: new Set(), game: null, round: null, timer: null });
+    if (!rooms.has(roomId)) rooms.set(roomId, { conns: new Set(), game: null, round: null, timer: null, purge: null });
     return rooms.get(roomId);
   }
 
@@ -52,12 +54,22 @@ export function createHub({ pool, now = Date.now, setTimer = setTimeout, clearTi
   }
 
   async function connect(roomId, conn) {
-    roomOf(roomId).conns.add(conn);
+    const room = roomOf(roomId);
+    if (room.purge) clearTimer(room.purge);
+    room.purge = null;
+    room.conns.add(conn);
     await broadcast(roomId);
   }
 
   async function disconnect(roomId, conn) {
-    roomOf(roomId).conns.delete(conn);
+    const room = roomOf(roomId);
+    room.conns.delete(conn);
+    if (room.conns.size === 0) {
+      room.purge = setTimer(() => {
+        stopTimer(room);
+        rooms.delete(roomId);
+      }, IDLE_MS);
+    }
     await broadcast(roomId);
   }
 

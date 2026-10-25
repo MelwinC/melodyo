@@ -249,3 +249,26 @@ describe('participants', () => {
     expect(h.last().participants.find(p => p.id === b.id).connected).toBe(false);
   });
 });
+
+describe('mémoire', () => {
+  it('oublie une room restée 2 h sans aucune connexion', async () => {
+    const { room, gameId, a, h, pa, pb } = await setup({ timer: 'full' });
+    await hub.hostEvent(room.id, { type: 'game:start', gameId });
+    await hub.hostEvent(room.id, { type: 'round:start', position: 0, durationMs: 3 * 3600 * 1000 });
+    for (const c of [h, pa, pb]) await hub.disconnect(room.id, c);
+    await timers.advance(2 * 3600 * 1000);
+    expect(await hub.answer(room.id, a.id, { position: 0, title: 'x', artist: '' })).toBe('closed');
+    expect(timers.count()).toBe(0);
+  });
+
+  it('garde la room si quelqu\'un revient avant', async () => {
+    const { room, gameId, a, h, pa, pb } = await setup({ timer: 'full' });
+    await hub.hostEvent(room.id, { type: 'game:start', gameId });
+    await hub.hostEvent(room.id, { type: 'round:start', position: 0, durationMs: 3 * 3600 * 1000 });
+    for (const c of [h, pa, pb]) await hub.disconnect(room.id, c);
+    await timers.advance(3600 * 1000);
+    await hub.connect(room.id, conn('player', a.id));
+    await timers.advance(3600 * 1000);
+    expect(await hub.answer(room.id, a.id, { position: 0, title: 'x', artist: '' })).toBe('saved');
+  });
+});
