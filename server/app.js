@@ -2,6 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import { createLimiters } from './rate-limits.js';
 import { accountsRouter } from './routes/accounts.js';
+import { avatarsRouter } from './routes/avatars.js';
 import { authRouter } from './routes/auth.js';
 import { loadSession } from './session-middleware.js';
 import { healthRouter } from './routes/health.js';
@@ -19,6 +20,7 @@ export function createApp({ config, pool, limits }) {
   app.use('/api', express.json({ limit: '10kb' }));
   app.use(loadSession(pool));
   app.use(accountsRouter({ pool, config, limiters: createLimiters(limits) }));
+  app.use(avatarsRouter({ pool, config }));
   app.use(authRouter(config));
   app.use(spotifyProxyRouter());
 

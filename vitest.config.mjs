@@ -8,7 +8,7 @@ export default defineConfig({
         test: {
           name: 'server',
           environment: 'node',
-          include: ['server/**/*.test.js'],
+          include: ['server/**/*.test.js', 'shared/**/*.test.js'],
           globalSetup: ['test/pg-global-setup.js'],
         },
       },
@@ -24,7 +24,7 @@ export default defineConfig({
     ],
     coverage: {
       provider: 'v8',
-      include: ['server/**/*.js', 'client/src/**/*.{js,jsx}'],
+      include: ['server/**/*.js', 'shared/**/*.js', 'client/src/**/*.{js,jsx}'],
       exclude: ['**/*.test.{js,jsx}'],
       reporter: ['text-summary', 'text'],
       thresholds: { lines: 100, branches: 100, functions: 100, statements: 100 },
