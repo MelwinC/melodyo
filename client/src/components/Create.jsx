@@ -50,15 +50,13 @@ export default function Create({ onStart }) {
     : limitedBy ? `max ${max} (${limitedBy.emoji} ${limitedBy.label})` : `max ${max}`;
 
   async function doCreate() {
-    if (!selected.length) return;
     activate();
     setProgress({ label: 'Démarrage…', pct: 0 });
     try {
       const tracks = await buildTracks(selected, value, (label, pct) => setProgress({ label, pct }));
       if (!tracks.length) throw new Error('Aucun son trouvé pour ces thèmes.');
       setProgress({ label: 'Lancement…', pct: 95 });
-      const title = selected.map(id => findTheme(id)?.emoji || '').join(' ');
-      onStart(tracks, title || 'Melodyo');
+      onStart(tracks, selected.map(id => findTheme(id).emoji).join(' '));
     } catch (e) {
       toast('Erreur : ' + e.message);
       setProgress(null);
