@@ -1,87 +1,60 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-let spotify;
+vi.mock('./session.js', () => ({ markSpotifyUnlinked: vi.fn() }));
 
-function response(status, body) {
-  return { status, ok: status < 400, json: async () => body };
-}
+let spotify, session;
+const response = (status, body) => ({ status, ok: status < 400, json: async () => body });
 
 beforeEach(async () => {
   vi.resetModules();
-  localStorage.clear();
   vi.stubGlobal('fetch', vi.fn());
   spotify = await import('./spotify.js');
+  session = await import('./session.js');
 });
-afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
-
-describe('tokens', () => {
-  it('loadTokens indique s\'il existe une session', () => {
-    expect(spotify.loadTokens()).toBe(false);
-    localStorage.setItem('bt_token', 't');
-    expect(spotify.loadTokens()).toBe(true);
-    expect(spotify.getToken()).toBe('t');
-  });
-
-  it('saveTokens enregistre les tokens et expire 60 s avant Spotify', () => {
-    vi.useFakeTimers({ now: 1_000_000 });
-    spotify.saveTokens('a', 'r', 3600);
-    expect(localStorage.getItem('bt_token')).toBe('a');
-    expect(localStorage.getItem('bt_refresh')).toBe('r');
-    expect(Number(localStorage.getItem('bt_expiry'))).toBe(1_000_000 + 3540 * 1000);
-  });
-});
+afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); vi.useRealTimers(); });
 
 describe('ensureToken', () => {
-  it('ne renouvelle pas un token encore valide', async () => {
-    spotify.saveTokens('a', 'r', 3600);
+  it('récupère le token du SDK auprès du serveur', async () => {
+    fetch.mockResolvedValue(response(200, { accessToken: 'tok', expiresAt: new Date(Date.now() + 60_000).toISOString() }));
     await spotify.ensureToken();
-    expect(fetch).not.toHaveBeenCalled();
+    expect(fetch.mock.calls[0][0]).toBe('/api/spotify/token');
+    expect(spotify.getToken()).toBe('tok');
   });
 
-  it('ne lance qu\'un seul renouvellement pour des appels simultanés', async () => {
-    spotify.saveTokens('a', 'r', 0);
-    fetch.mockResolvedValue(response(200, { access_token: 'b', refresh_token: 'r2', expires_in: 3600 }));
+  it('réutilise le token tant qu\'il est valide et partage les appels simultanés', async () => {
+    fetch.mockResolvedValue(response(200, { accessToken: 'tok', expiresAt: new Date(Date.now() + 60_000).toISOString() }));
     await Promise.all([spotify.ensureToken(), spotify.ensureToken()]);
+    await spotify.ensureToken();
     expect(fetch).toHaveBeenCalledOnce();
-    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ refresh_token: 'r' });
-    expect(spotify.getToken()).toBe('b');
-    expect(localStorage.getItem('bt_refresh')).toBe('r2');
   });
 
-  it('garde l\'ancien refresh token si Spotify n\'en renvoie pas', async () => {
-    spotify.saveTokens('a', 'r', 0);
-    fetch.mockResolvedValue(response(200, { access_token: 'b', expires_in: 3600 }));
+  it('redemande un token expiré', async () => {
+    fetch.mockResolvedValue(response(200, { accessToken: 'tok', expiresAt: new Date(Date.now() - 1000).toISOString() }));
     await spotify.ensureToken();
-    expect(localStorage.getItem('bt_refresh')).toBe('r');
-  });
-
-  it('reprend le refresh token stocké si la session n\'est pas chargée', async () => {
-    localStorage.setItem('bt_refresh', 'stocké');
-    fetch.mockResolvedValue(response(200, { access_token: 'b', expires_in: 3600 }));
     await spotify.ensureToken();
-    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ refresh_token: 'stocké' });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
-  it('échoue sans refresh token', async () => {
-    await expect(spotify.ensureToken()).rejects.toThrow('not_logged_in');
+  it.each(['spotify_not_linked', 'spotify_relink_required'])('demande de relier Spotify (%s)', async code => {
+    fetch.mockResolvedValue(response(409, { error: code }));
+    await expect(spotify.ensureToken()).rejects.toThrow('Reconnecte ton compte Spotify');
+    expect(session.markSpotifyUnlinked).toHaveBeenCalled();
   });
 
-  it('signale une session expirée si le renouvellement échoue', async () => {
-    spotify.saveTokens('a', 'r', 0);
-    fetch.mockResolvedValue(response(400, { error: 'refresh_failed' }));
-    await expect(spotify.ensureToken()).rejects.toThrow(/Session expirée/);
+  it('signale un serveur Spotify injoignable', async () => {
+    fetch.mockResolvedValue(response(502, { error: 'spotify_unreachable' }));
+    await expect(spotify.ensureToken()).rejects.toThrow('Spotify injoignable, réessaie');
+    expect(session.markSpotifyUnlinked).not.toHaveBeenCalled();
   });
 });
 
 describe('api', () => {
-  beforeEach(() => spotify.saveTokens('tok', 'r', 3600));
-
-  it('envoie le token et le corps JSON', async () => {
+  it('appelle le proxy sans token côté client', async () => {
     fetch.mockResolvedValue(response(200, { id: 'u' }));
     expect(await spotify.api('PUT', '/me/player', { a: 1 })).toEqual({ id: 'u' });
     const [url, init] = fetch.mock.calls[0];
     expect(url).toBe('/spotify/me/player');
-    expect(init.headers['x-token']).toBe('tok');
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
     expect(JSON.parse(init.body)).toEqual({ a: 1 });
   });
 
@@ -91,18 +64,21 @@ describe('api', () => {
     expect(fetch.mock.calls[0][1].body).toBeUndefined();
   });
 
-  it('renvoie null pour une réponse 204', async () => {
+  it('renvoie null pour 204', async () => {
     fetch.mockResolvedValue({ status: 204 });
     expect(await spotify.api('PUT', '/me/player/pause')).toBeNull();
   });
 
-  it('remonte le message d\'erreur Spotify', async () => {
-    fetch.mockResolvedValue(response(404, { error: { message: 'Not found' } }));
-    await expect(spotify.api('GET', '/x')).rejects.toThrow('Not found');
+  it('demande de relier Spotify sur un 409', async () => {
+    fetch.mockResolvedValue(response(409, { error: 'spotify_relink_required' }));
+    await expect(spotify.api('GET', '/me')).rejects.toThrow('Reconnecte ton compte Spotify');
+    expect(session.markSpotifyUnlinked).toHaveBeenCalled();
   });
 
-  it('remonte le statut si Spotify ne donne pas de message', async () => {
-    fetch.mockResolvedValue(response(500, {}));
-    await expect(spotify.api('GET', '/x')).rejects.toThrow('Erreur Spotify 500');
+  it('remonte le message d\'erreur Spotify ou le statut', async () => {
+    fetch.mockResolvedValue(response(404, { error: { message: 'Not found' } }));
+    await expect(spotify.api('GET', '/x')).rejects.toThrow('Not found');
+    fetch.mockResolvedValue(response(502, { error: 'ENOTFOUND' }));
+    await expect(spotify.api('GET', '/x')).rejects.toThrow('Erreur Spotify 502');
   });
 });

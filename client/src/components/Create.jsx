@@ -2,13 +2,9 @@ import { useEffect, useState } from 'react';
 import { THEMES, findTheme, sliderBounds } from '../lib/themes.js';
 import { buildTracks, getThemeCounts, loadThemePool } from '../lib/tracks.js';
 import { activate, disconnect, ensurePlayer, isFirefox } from '../lib/player.js';
+import { logout } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
-
-function logout() {
-  disconnect();
-  localStorage.clear();
-  location.reload();
-}
+import Avatar from './Avatar.jsx';
 
 // Nombre de sons d'un thème : un nombre, 'loading' ou 'error'
 function countLabel(count) {
@@ -18,7 +14,7 @@ function countLabel(count) {
   return '';
 }
 
-export default function Create({ onStart }) {
+export default function Create({ user, onStart, onProfile }) {
   const [selected, setSelected] = useState([]);
   const [counts, setCounts] = useState(getThemeCounts);
   const [perTheme, setPerTheme] = useState(5);
@@ -66,9 +62,12 @@ export default function Create({ onStart }) {
   return (
     <div className="screen">
       <header>
-        <span style={{ width: 60 }}></span>
+        <button className="user-chip" onClick={onProfile} aria-label="Mon profil">
+          <Avatar avatar={user.avatar} size={28} />
+          <span>{user.username}</span>
+        </button>
         <h1>🎵 Melodyo</h1>
-        <button className="btn btn-ghost btn-sm" onClick={logout}>Déco.</button>
+        <button className="btn btn-ghost btn-sm" onClick={() => { disconnect(); logout(); }}>Déco.</button>
       </header>
       {isFirefox && (
         <div className="browser-warning">

@@ -1,33 +1,34 @@
-import { useEffect, useState } from 'react';
-import { api, getToken, loadTokens, saveTokens } from './lib/spotify.js';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { ensurePlayer, pause, startQueue } from './lib/player.js';
-import Login from './components/Login.jsx';
+import { getSession, loadSession, subscribeSession } from './lib/session.js';
+import { toast } from './lib/toast.js';
+import Auth from './components/Auth.jsx';
 import Create from './components/Create.jsx';
+import LinkSpotify from './components/LinkSpotify.jsx';
 import Player from './components/Player.jsx';
+import Profile from './components/Profile.jsx';
 import Toast from './components/Toast.jsx';
 
-// Récupère les tokens renvoyés par /callback ; true si l'utilisateur a une session
-function readAuthParams() {
-  const params = new URLSearchParams(location.search);
-  if (params.get('access_token')) {
-    saveTokens(params.get('access_token'), params.get('refresh_token'), parseInt(params.get('expires_in')));
-    history.replaceState({}, '', '/');
-  }
-  if (params.get('error')) {
-    alert('Erreur de connexion : ' + params.get('error'));
-    history.replaceState({}, '', '/');
-  }
-  return loadTokens();
+const URL_ERRORS = {
+  access_denied: 'Connexion Spotify refusée',
+  login_required: 'Session expirée, reconnecte-toi',
+};
+
+// Erreur renvoyée par le retour de Spotify (/callback) : affichée une fois puis retirée de l'URL
+function showUrlError() {
+  const error = new URLSearchParams(location.search).get('error');
+  if (!error) return;
+  toast(URL_ERRORS[error] ?? 'Échec de la liaison Spotify');
+  history.replaceState({}, '', '/');
 }
 
 export default function App() {
-  const [screen, setScreen] = useState(() => ({ name: readAuthParams() ? 'loading' : 'login' }));
+  const session = useSyncExternalStore(subscribeSession, getSession);
+  const [screen, setScreen] = useState({ name: 'create' });
 
   useEffect(() => {
-    if (!getToken()) return;
-    api('GET', '/me')
-      .then(() => setScreen({ name: 'create' }))
-      .catch(() => setScreen({ name: 'login' }));
+    showUrlError();
+    loadSession();
   }, []);
 
   async function startGame(tracks, title) {
@@ -49,13 +50,25 @@ export default function App() {
     setScreen({ name: 'create' });
   }
 
+  const toCreate = () => setScreen({ name: 'create' });
+  let content;
+  if (session.status === 'loading') {
+    content = <div className="player-loading"><div className="player-loading-spinner"></div></div>;
+  } else if (session.status === 'anonymous') {
+    content = <Auth />;
+  } else if (!session.user.spotifyLinked) {
+    content = <LinkSpotify user={session.user} />;
+  } else if (screen.name === 'profile') {
+    content = <Profile user={session.user} onBack={toCreate} />;
+  } else if (screen.name === 'player') {
+    content = <Player {...screen} onExit={exitPlayer} onBack={toCreate} />;
+  } else {
+    content = <Create user={session.user} onStart={startGame} onProfile={() => setScreen({ name: 'profile' })} />;
+  }
+
   return (
     <>
-      {screen.name === 'login' && <Login />}
-      {screen.name === 'create' && <Create onStart={startGame} />}
-      {screen.name === 'player' && (
-        <Player {...screen} onExit={exitPlayer} onBack={() => setScreen({ name: 'create' })} />
-      )}
+      {content}
       <Toast />
     </>
   );

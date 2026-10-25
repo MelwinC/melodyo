@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildTracks, getThemeCounts, loadThemePool } from '../lib/tracks.js';
 import { activate, disconnect, ensurePlayer } from '../lib/player.js';
+import { logout } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 import Create from './Create.jsx';
 
@@ -10,11 +11,13 @@ const state = vi.hoisted(() => ({ firefox: false }));
 
 vi.mock('../lib/tracks.js', () => ({ buildTracks: vi.fn(), getThemeCounts: vi.fn(), loadThemePool: vi.fn() }));
 vi.mock('../lib/toast.js', () => ({ toast: vi.fn() }));
+vi.mock('../lib/session.js', () => ({ logout: vi.fn() }));
 vi.mock('../lib/player.js', () => ({
   activate: vi.fn(), disconnect: vi.fn(), ensurePlayer: vi.fn(),
   get isFirefox() { return state.firefox; },
 }));
 
+const user = { username: 'Mel', avatar: { kind: 'preset', value: 'micro' } };
 const pool = n => Array.from({ length: n }, (_, i) => ({ uri: `u${i}` }));
 const card = label => screen.getByText(label).closest('label');
 const badgeOf = text => screen.getByText(text).closest('label').querySelector('.badge');
@@ -31,14 +34,14 @@ afterEach(() => vi.clearAllMocks());
 describe('Create', () => {
   it('prépare le lecteur et ignore son échec', async () => {
     ensurePlayer.mockRejectedValue(new Error('x'));
-    render(<Create onStart={vi.fn()} />);
+    render(<Create user={user} onProfile={vi.fn()} onStart={vi.fn()} />);
     await waitFor(() => expect(ensurePlayer).toHaveBeenCalled());
   });
 
   it('compte les sons d\'un thème coché', async () => {
     let resolve;
     loadThemePool.mockReturnValue(new Promise(r => { resolve = r; }));
-    render(<Create onStart={vi.fn()} />);
+    render(<Create user={user} onProfile={vi.fn()} onStart={vi.fn()} />);
     await userEvent.click(card('Années 80'));
     expect(card('Années 80')).toHaveClass('selected');
     expect(card('Années 80')).toHaveTextContent('…');
@@ -54,7 +57,7 @@ describe('Create', () => {
   it('ne recompte pas un thème en cours de chargement ou déjà compté', async () => {
     loadThemePool.mockReturnValue(new Promise(() => {}));
     getThemeCounts.mockReturnValue({ pop: 80 });
-    render(<Create onStart={vi.fn()} />);
+    render(<Create user={user} onProfile={vi.fn()} onStart={vi.fn()} />);
     await userEvent.click(card('Années 80'));
     await userEvent.click(card('Années 80'));
     await userEvent.click(card('Années 80'));
@@ -65,7 +68,7 @@ describe('Create', () => {
 
   it('décoche un thème indisponible', async () => {
     loadThemePool.mockRejectedValue(new Error('vide'));
-    render(<Create onStart={vi.fn()} />);
+    render(<Create user={user} onProfile={vi.fn()} onStart={vi.fn()} />);
     await userEvent.click(card('Disney FR'));
     await waitFor(() => expect(card('Disney FR')).toHaveTextContent('indispo'));
     expect(card('Disney FR')).not.toHaveClass('selected');
@@ -74,7 +77,7 @@ describe('Create', () => {
 
   it('limite le curseur au thème le plus petit, avec Min et Max', async () => {
     getThemeCounts.mockReturnValue({ '80s': 120, disney: 23 });
-    render(<Create onStart={vi.fn()} />);
+    render(<Create user={user} onProfile={vi.fn()} onStart={vi.fn()} />);
     await userEvent.click(card('Années 80'));
     await userEvent.click(screen.getByRole('button', { name: 'Max' }));
     expect(slider()).toHaveValue('50');
@@ -97,7 +100,7 @@ describe('Create', () => {
       return new Promise(r => { finish = r; });
     });
     const onStart = vi.fn();
-    render(<Create onStart={onStart} />);
+    render(<Create user={user} onProfile={vi.fn()} onStart={onStart} />);
     await userEvent.click(card('Années 80'));
     await userEvent.click(card('Pop'));
     await userEvent.click(launch());
@@ -113,7 +116,7 @@ describe('Create', () => {
   it('signale une partie sans aucun son', async () => {
     getThemeCounts.mockReturnValue({ '80s': 120 });
     buildTracks.mockResolvedValue([]);
-    render(<Create onStart={vi.fn()} />);
+    render(<Create user={user} onProfile={vi.fn()} onStart={vi.fn()} />);
     await userEvent.click(card('Années 80'));
     await userEvent.click(launch());
     expect(toast).toHaveBeenCalledWith('Erreur : Aucun son trouvé pour ces thèmes.');
@@ -123,19 +126,22 @@ describe('Create', () => {
 
   it('avertit les utilisateurs de Firefox', () => {
     state.firefox = true;
-    render(<Create onStart={vi.fn()} />);
+    render(<Create user={user} onProfile={vi.fn()} onStart={vi.fn()} />);
     expect(screen.getByText(/Firefox ne peut pas lire l'audio Spotify/)).toBeInTheDocument();
   });
 
-  it('déconnecte et recharge la page', async () => {
-    const reload = vi.fn();
-    vi.stubGlobal('location', { reload });
-    localStorage.setItem('bt_token', 't');
-    render(<Create onStart={vi.fn()} />);
+  it('se déconnecte et coupe le lecteur', async () => {
+    render(<Create user={user} onProfile={vi.fn()} onStart={vi.fn()} />);
     await userEvent.click(screen.getByRole('button', { name: 'Déco.' }));
     expect(disconnect).toHaveBeenCalled();
-    expect(localStorage.getItem('bt_token')).toBeNull();
-    expect(reload).toHaveBeenCalled();
-    vi.unstubAllGlobals();
+    expect(logout).toHaveBeenCalled();
+  });
+
+  it('affiche le compte et ouvre le profil', async () => {
+    const onProfile = vi.fn();
+    render(<Create user={user} onProfile={onProfile} onStart={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Mon profil' })).toHaveTextContent('🎤Mel');
+    await userEvent.click(screen.getByRole('button', { name: 'Mon profil' }));
+    expect(onProfile).toHaveBeenCalled();
   });
 });
