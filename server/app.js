@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import { createLimiters } from './rate-limits.js';
 import { accountsRouter } from './routes/accounts.js';
 import { avatarsRouter } from './routes/avatars.js';
+import { gamesRouter } from './routes/games.js';
 import { loadSession } from './session-middleware.js';
 import { healthRouter } from './routes/health.js';
 import { spotifyAuthRouter } from './routes/spotify-auth.js';
@@ -16,10 +17,13 @@ export function createApp({ config, pool, limits }) {
   app.use(healthRouter(pool));
   // Le proxy relaie jusqu'à 500 URIs au lancement d'une partie
   app.use('/spotify', express.json({ limit: '100kb' }));
+  // Une partie enregistrée peut compter 500 chansons ; le reste de l'API n'attend que de petits corps
+  app.use('/api/games', express.json({ limit: '300kb' }));
   app.use('/api', express.json({ limit: '10kb' }));
   app.use(loadSession(pool));
   app.use(accountsRouter({ pool, config, limiters: createLimiters(limits, { clientIpHeader: config.clientIpHeader }) }));
   app.use(avatarsRouter({ pool, config }));
+  app.use(gamesRouter({ pool }));
   app.use(spotifyAuthRouter({ pool, config }));
   app.use(spotifyProxyRouter({ pool, config }));
 

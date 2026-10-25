@@ -6,6 +6,8 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 export default [
   { ignores: ['dist/', 'node_modules/'] },
   js.configs.recommended,
+  // { champ: _, ...reste } sert à retirer un champ d'un objet
+  { rules: { 'no-unused-vars': ['error', { ignoreRestSiblings: true }] } },
   {
     files: ['client/**/*.{js,jsx}'],
     languageOptions: {
