@@ -116,3 +116,49 @@ export async function findParticipantFor(pool, roomId, { userId, guestToken }) {
   if (byAccount || !guestToken) return byAccount;
   return findParticipant(pool, roomId, { guestToken });
 }
+
+/* ── CORRECTION ── */
+const VALIDATION_COLUMNS = { title: ['title_ok', 'title'], artist: ['artist_ok', 'artist'] };
+
+// Une réponse vide n'est jamais correcte : faux si le champ est vide ou s'il n'y a pas de réponse
+export async function setValidation(pool, { gameId, position, participantId, field, ok }) {
+  const [column, text] = VALIDATION_COLUMNS[field];
+  const { rowCount } = await pool.query(
+    `UPDATE answers SET ${column} = $4 WHERE game_id = $1 AND position = $2 AND participant_id = $3 AND ${text} <> ''`,
+    [gameId, position, participantId, ok],
+  );
+  return rowCount > 0;
+}
+
+export async function getCorrections(pool, gameId, position) {
+  const { rows } = await pool.query(
+    'SELECT participant_id, title, artist, title_ok, artist_ok FROM answers WHERE game_id = $1 AND position = $2',
+    [gameId, position],
+  );
+  return new Map(rows.map(r => [r.participant_id, { title: r.title, artist: r.artist, titleOk: r.title_ok, artistOk: r.artist_ok }]));
+}
+
+export async function resetValidations(pool, gameId, position) {
+  await pool.query('UPDATE answers SET title_ok = NULL, artist_ok = NULL WHERE game_id = $1 AND position = $2', [gameId, position]);
+}
+
+export async function markRevealed(pool, gameId, position) {
+  await pool.query('INSERT INTO game_reveals (game_id, position) VALUES ($1, $2) ON CONFLICT DO NOTHING', [gameId, position]);
+}
+
+export async function unreveal(pool, gameId, position) {
+  await pool.query('DELETE FROM game_reveals WHERE game_id = $1 AND position = $2', [gameId, position]);
+}
+
+export async function getRevealed(pool, gameId) {
+  const { rows } = await pool.query('SELECT position FROM game_reveals WHERE game_id = $1', [gameId]);
+  return new Set(rows.map(r => r.position));
+}
+
+export async function getTrack(pool, gameId, position) {
+  const { rows } = await pool.query(
+    'SELECT position, name, artists, album_image FROM game_tracks WHERE game_id = $1 AND position = $2',
+    [gameId, position],
+  );
+  return rows[0] ? { position: rows[0].position, name: rows[0].name, artists: rows[0].artists, albumImage: rows[0].album_image } : null;
+}

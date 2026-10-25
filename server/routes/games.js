@@ -22,6 +22,7 @@ const gameSchema = z.object({
     perTheme: z.number().int().min(1).max(50),
     timer: z.enum(['30s', 'full']),
     start: z.enum(['start', 'middle']),
+    correction: z.enum(['live', 'end']).default('live'),
   }),
   tracks: z.array(trackSchema.extend({ fromReview: z.boolean() })).min(1).max(500),
   roomId: z.uuid().optional(),

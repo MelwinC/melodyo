@@ -5,7 +5,8 @@ import { settings, track } from '../../test/games.js';
 import { createPool } from '../db.js';
 import { createGame } from '../games.js';
 import {
-  closeRoom, findOpenRoomByCode, findParticipant, getAnswers, getAnswersOf,
+  closeRoom, findOpenRoomByCode, findParticipant, getAnswers, getAnswersOf, getCorrections, getRevealed, getTrack,
+  markRevealed, resetValidations, setValidation, unreveal,
   joinAsGuest, joinAsUser, listParticipants, openRoomFor, saveAnswer,
 } from './repo.js';
 
@@ -111,5 +112,53 @@ describe('réponses', () => {
     ]));
     const { rows } = await pool.query('SELECT room_id FROM games WHERE id = $1', [gameId]);
     expect(rows[0].room_id).toBe(room.id);
+  });
+});
+
+describe('correction', () => {
+  async function game() {
+    const host = await insertUser(pool);
+    const room = await openRoomFor(pool, host.id);
+    const { id: gameId } = await createGame(pool, host.id, { settings: settings(), tracks: [track(0), track(1)], roomId: room.id });
+    const { participant } = await joinAsGuest(pool, room.id, 'A');
+    return { gameId, p: participant };
+  }
+
+  it('enregistre la dernière validation et la remet à zéro', async () => {
+    const { gameId, p } = await game();
+    await saveAnswer(pool, { gameId, position: 0, participantId: p.id, title: 'T', artist: 'A' });
+    const set = (field, ok) => setValidation(pool, { gameId, position: 0, participantId: p.id, field, ok });
+    expect(await set('title', true)).toBe(true);
+    await set('title', false);
+    await set('title', true);
+    await set('artist', false);
+    expect(await getCorrections(pool, gameId, 0)).toEqual(new Map([[p.id, { title: 'T', artist: 'A', titleOk: true, artistOk: false }]]));
+    await resetValidations(pool, gameId, 0);
+    expect((await getCorrections(pool, gameId, 0)).get(p.id)).toMatchObject({ titleOk: null, artistOk: null });
+    expect(await getAnswers(pool, gameId, 0)).toEqual(new Map([[p.id, { title: 'T', artist: 'A' }]]));
+  });
+
+  it('refuse de valider un champ vide ou une réponse absente', async () => {
+    const { gameId, p } = await game();
+    expect(await setValidation(pool, { gameId, position: 1, participantId: p.id, field: 'title', ok: true })).toBe(false);
+    await saveAnswer(pool, { gameId, position: 0, participantId: p.id, title: 'T', artist: '' });
+    expect(await setValidation(pool, { gameId, position: 0, participantId: p.id, field: 'artist', ok: true })).toBe(false);
+    expect((await getCorrections(pool, gameId, 0)).get(p.id).artistOk).toBeNull();
+  });
+
+  it('marque, liste et retire les chansons révélées', async () => {
+    const { gameId } = await game();
+    await markRevealed(pool, gameId, 1);
+    await markRevealed(pool, gameId, 1);
+    await markRevealed(pool, gameId, 0);
+    expect(await getRevealed(pool, gameId)).toEqual(new Set([0, 1]));
+    await unreveal(pool, gameId, 1);
+    expect(await getRevealed(pool, gameId)).toEqual(new Set([0]));
+  });
+
+  it('lit une chanson de la partie', async () => {
+    const { gameId } = await game();
+    expect(await getTrack(pool, gameId, 1)).toEqual({ position: 1, name: 'Titre 1', artists: ['Artiste 1'], albumImage: 'https://i.scdn.co/image/1' });
+    expect(await getTrack(pool, gameId, 9)).toBeNull();
   });
 });

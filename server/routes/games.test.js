@@ -30,6 +30,7 @@ describe('POST /api/games', () => {
   it.each([
     ['trop de sons par thème', body({ settings: settings({ perTheme: 51 }) })],
     ['un timer inconnu', body({ settings: settings({ timer: 'x' }) })],
+    ['une correction inconnue', body({ settings: settings({ correction: 'x' }) })],
     ['un thème inconnu', body({ settings: settings({ themes: ['jazz'] }) })],
     ['aucun thème', body({ settings: settings({ themes: [] }) })],
     ['une URI qui n\'est pas Spotify', body({ tracks: [track(0, { uri: 'https://evil' })] })],
@@ -47,6 +48,13 @@ describe('POST /api/games', () => {
     const tracks = Array.from({ length: 500 }, (_, i) => track(i, { name: `Un titre assez long numéro ${i}`, artists: ['Artiste A', 'Artiste B'] }));
     const res = await (await host()).post('/api/games').send(body({ tracks }));
     expect(res.status).toBe(201);
+  });
+
+  it('applique la correction à la volée par défaut', async () => {
+    const agent = await host();
+    const { correction, ...older } = settings();
+    const { id } = (await agent.post('/api/games').send(body({ settings: older }))).body;
+    expect((await agent.get(`/api/games/${id}`)).body.game.settings.correction).toBe('live');
   });
 
   it('accepte une chanson sans pochette', async () => {
