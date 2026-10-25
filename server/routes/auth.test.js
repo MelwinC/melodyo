@@ -133,3 +133,17 @@ describe('POST /refresh', () => {
     expect(res.body).toEqual({ error: 'refresh_failed' });
   });
 });
+
+describe('limite des connexions en attente', () => {
+  it('oublie les plus anciennes au-delà du plafond', async () => {
+    const { authRouter } = await import('./auth.js');
+    const express = (await import('express')).default;
+    const a = express().use(authRouter(config, { maxPending: 2 }));
+    const states = [];
+    for (let i = 0; i < 3; i++) states.push((await login(request(a))).searchParams.get('state'));
+    fetch.mockResolvedValue(jsonResponse(200, { access_token: 'a', refresh_token: 'r', expires_in: 3600 }));
+
+    expect((await request(a).get(`/callback?code=c&state=${states[0]}`)).headers.location).toBe('/?error=invalid_state');
+    expect((await request(a).get(`/callback?code=c&state=${states[2]}`)).headers.location).toMatch(/access_token=a/);
+  });
+});

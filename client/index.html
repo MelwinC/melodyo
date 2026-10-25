@@ -7,10 +7,7 @@
 </head>
 <body>
   <div id="app"></div>
-  <script>
-    // Doit exister avant le chargement du SDK, qui appelle ce callback dès qu'il est prêt
-    window.spotifySdkReady = new Promise(r => { window.onSpotifyWebPlaybackSDKReady = r; });
-  </script>
+  <script src="/sdk-ready.js"></script>
   <script src="https://sdk.scdn.co/spotify-player.js"></script>
   <script type="module" src="/src/main.jsx"></script>
 </body>

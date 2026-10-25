@@ -24,7 +24,7 @@ function postForm(params) {
   });
 }
 
-export function authRouter(config) {
+export function authRouter(config, { maxPending = 1000 } = {}) {
   const router = express.Router();
   const pendingAuth = new Map();
 
@@ -33,6 +33,8 @@ export function authRouter(config) {
     const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
     const state = crypto.randomBytes(16).toString('hex');
 
+    // Plafond : des appels en rafale à /login ne peuvent pas faire grossir la mémoire sans limite
+    if (pendingAuth.size >= maxPending) pendingAuth.delete(pendingAuth.keys().next().value);
     pendingAuth.set(state, verifier);
     setTimeout(() => pendingAuth.delete(state), STATE_TTL_MS).unref();
 
