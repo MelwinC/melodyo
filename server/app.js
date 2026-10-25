@@ -4,12 +4,16 @@ import { createLimiters } from './rate-limits.js';
 import { accountsRouter } from './routes/accounts.js';
 import { avatarsRouter } from './routes/avatars.js';
 import { gamesRouter } from './routes/games.js';
+import { roomsRouter } from './routes/rooms.js';
 import { loadSession } from './session-middleware.js';
 import { healthRouter } from './routes/health.js';
 import { spotifyAuthRouter } from './routes/spotify-auth.js';
 import { spotifyProxyRouter } from './routes/spotify-proxy.js';
 
-export function createApp({ config, pool, limits }) {
+// hub : diffusion temps réel des rooms (fourni par le serveur WebSocket)
+const noHub = { participantsChanged: () => {} };
+
+export function createApp({ config, pool, limits, hub = noHub }) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', config.trustProxy);
@@ -21,9 +25,11 @@ export function createApp({ config, pool, limits }) {
   app.use('/api/games', express.json({ limit: '300kb' }));
   app.use('/api', express.json({ limit: '10kb' }));
   app.use(loadSession(pool));
-  app.use(accountsRouter({ pool, config, limiters: createLimiters(limits, { clientIpHeader: config.clientIpHeader }) }));
+  const limiters = createLimiters(limits, { clientIpHeader: config.clientIpHeader });
+  app.use(accountsRouter({ pool, config, limiters }));
   app.use(avatarsRouter({ pool, config }));
   app.use(gamesRouter({ pool }));
+  app.use(roomsRouter({ pool, config, limiters, hub }));
   app.use(spotifyAuthRouter({ pool, config }));
   app.use(spotifyProxyRouter({ pool, config }));
 

@@ -4,6 +4,7 @@ export const DEFAULT_LIMITS = {
   loginPerIp: { windowMs: 15 * 60_000, limit: 20 },
   loginPerUser: { windowMs: 15 * 60_000, limit: 10 },
   registerPerIp: { windowMs: 60 * 60_000, limit: 10 },
+  joinPerIp: { windowMs: 10 * 60_000, limit: 30 },
 };
 
 const tooMany = (req, res) => res.status(429).json({ error: 'too_many_requests' });
@@ -20,5 +21,6 @@ export function createLimiters(limits = DEFAULT_LIMITS, { clientIpHeader = null 
       keyGenerator: req => `user:${String(req.body?.username).toLowerCase()}`,
     }),
     registerPerIp: rateLimit({ ...base, ...limits.registerPerIp, keyGenerator: clientIp }),
+    joinPerIp: rateLimit({ ...base, ...limits.joinPerIp, keyGenerator: clientIp }),
   };
 }

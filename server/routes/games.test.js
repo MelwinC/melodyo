@@ -118,3 +118,23 @@ describe('liste à revoir', () => {
     expect((await agent.delete('/api/review').send({ uri: 'x' })).status).toBe(400);
   });
 });
+
+describe('partie dans une room', () => {
+  it('rattache la partie à la room du créateur', async () => {
+    const agent = await host();
+    const { room } = (await agent.post('/api/rooms')).body;
+    const res = await agent.post('/api/games').send({ ...body(), roomId: room.id });
+    expect(res.status).toBe(201);
+    const { rows } = await pool.query('SELECT room_id FROM games WHERE id = $1', [res.body.id]);
+    expect(rows[0].room_id).toBe(room.id);
+  });
+
+  it.each([
+    ['la room d\'un autre compte', async () => (await (await host()).post('/api/rooms')).body.room.id],
+    ['un id invalide', async () => 'pas-un-uuid'],
+  ])('refuse %s', async (_, roomId) => {
+    const agent = await host();
+    const res = await agent.post('/api/games').send({ ...body(), roomId: await roomId() });
+    expect(res.status).toBe(400);
+  });
+});

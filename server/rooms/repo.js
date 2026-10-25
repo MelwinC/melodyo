@@ -94,3 +94,8 @@ export async function getAnswersOf(pool, gameId, participantId) {
   );
   return new Map(rows.map(r => [r.position, { title: r.title, artist: r.artist }]));
 }
+
+export async function isOpenRoomOf(pool, roomId, hostId) {
+  const { rowCount } = await pool.query('SELECT 1 FROM rooms WHERE id = $1 AND host_id = $2 AND closed_at IS NULL', [roomId, hostId]);
+  return rowCount > 0;
+}

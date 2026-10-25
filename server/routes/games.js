@@ -4,6 +4,7 @@ import { isThemeId } from '../../shared/themes.js';
 import { asyncRoute } from '../async-route.js';
 import { createGame, endGame, getGame, lastGameExclusions, listGames, markPlayed } from '../games.js';
 import { addReview, listReview, removeReview } from '../review.js';
+import { isOpenRoomOf } from '../rooms/repo.js';
 import { requireUser } from '../session-middleware.js';
 
 const uri = z.string().regex(/^spotify:track:[A-Za-z0-9]{1,80}$/);
@@ -23,6 +24,7 @@ const gameSchema = z.object({
     start: z.enum(['start', 'middle']),
   }),
   tracks: z.array(trackSchema.extend({ fromReview: z.boolean() })).min(1).max(500),
+  roomId: z.uuid().optional(),
 });
 const playedSchema = z.object({ position: z.number().int().min(0) });
 const gameId = z.uuid();
@@ -36,6 +38,8 @@ export function gamesRouter({ pool }) {
   router.post('/api/games', asyncRoute(async (req, res) => {
     const parsed = gameSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'invalid_game' });
+    const { roomId } = parsed.data;
+    if (roomId && !await isOpenRoomOf(pool, roomId, req.user.id)) return res.status(400).json({ error: 'invalid_game' });
     res.status(201).json(await createGame(pool, req.user.id, parsed.data));
   }));
 
