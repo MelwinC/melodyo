@@ -168,6 +168,7 @@ describe('partie en direct', () => {
 
     h.send({ type: 'playback', paused: true });
     await h.next(m => state(m) && m.round?.paused);
+    h.send({ type: 'round:close' });
     h.send({ type: 'game:final' });
     expect((await g.next(m => state(m) && m.phase === 'final')).revealed).toHaveLength(2);
     h.send({ type: 'game:end' });

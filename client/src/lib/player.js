@@ -16,6 +16,7 @@ let playedMs = 0;
 let lastTick = null;
 let extractDone = false;
 let lastPaused = null;
+let autoPaused = false;
 
 // Temps d'écoute de l'extrait : ne s'écoule que pendant la lecture (la pause l'arrête, un saut de ±10 s ne change rien)
 function extractPatch(paused) {
@@ -27,6 +28,7 @@ function extractPatch(paused) {
   // Une seule pause automatique par chanson : après la révélation, on peut écouter la suite
   if (remaining === 0 && !paused && !extractDone) {
     extractDone = true;
+    autoPaused = true;
     player.pause().catch(() => {});
   }
   return { remaining };
@@ -176,11 +178,14 @@ function onPlayerStateChanged(state) {
       started.add(idx);
     }
   }
+  const extract = extractPatch(state.paused);
   if (options.onPlayback && state.paused !== lastPaused) {
     lastPaused = state.paused;
-    options.onPlayback(state.paused);
+    // La pause automatique de fin d'extrait ne fige pas le délai de réponse des participants
+    if (state.paused && autoPaused) autoPaused = false;
+    else options.onPlayback(state.paused);
   }
-  update({ ...patch, ...extractPatch(state.paused) });
+  update({ ...patch, ...extract });
 }
 
 export async function pollPosition() {

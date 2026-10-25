@@ -23,7 +23,7 @@ export function createHub({ pool, now = Date.now, setTimer = setTimeout, clearTi
   }
 
   function emptyGame() {
-    return { game: null, round: null, phase: null, correction: null, revealed: new Set() };
+    return { game: null, round: null, phase: null, correction: null, revealed: new Set(), lastEnded: null };
   }
 
   function stopTimer(room) {
@@ -36,14 +36,16 @@ export function createHub({ pool, now = Date.now, setTimer = setTimeout, clearTi
     room.timer = setTimer(() => {
       room.timer = null;
       room.round.status = 'closed';
+      room.lastEnded = room.round.position;
       return broadcast(roomId).catch(logError);
     }, remainingMs(room.round.clock, now()));
   }
 
-  // Chanson en cours de correction : à la volée, la dernière manche fermée ; à la fin, la position parcourue
+  // Chanson en cours de correction : à la volée, la dernière manche terminée (échéance, verrouillage
+  // ou chanson suivante lancée) — on corrige la précédente pendant que la suivante joue ; à la fin, la position parcourue
   function correctionTarget(room) {
     if (room.phase === 'correcting') return room.correction.position;
-    if (room.phase === 'playing' && room.game.correction === 'live' && room.round?.status === 'closed') return room.round.position;
+    if (room.phase === 'playing' && room.game.correction === 'live') return room.lastEnded;
     return null;
   }
 
@@ -121,12 +123,13 @@ export function createHub({ pool, now = Date.now, setTimer = setTimeout, clearTi
     room.revealed.add(position);
   }
 
-  // Classement final : toutes les chansons sont dévoilées pour le détail des réponses
+  // Classement final : toutes les chansons sont dévoilées (avant le changement de phase, pour qu'aucun
+  // état « final » ne parte avec une chanson encore cachée)
   async function finish(room) {
     stopTimer(room);
+    for (let position = 0; position < room.game.total; position++) await reveal(room, position);
     room.phase = 'final';
     room.correction = null;
-    for (let position = 0; position < room.game.total; position++) await reveal(room, position);
   }
 
   // Renvoie true si l'événement a changé l'état (et doit être diffusé)
@@ -149,6 +152,13 @@ export function createHub({ pool, now = Date.now, setTimer = setTimeout, clearTi
     if (!room.game) return false;
     if (type === 'round:start') return startRound(roomId, room, event);
     if (type === 'playback') return playback(roomId, room, event);
+    if (type === 'round:close') {
+      if (room.round?.status !== 'open') return false;
+      stopTimer(room);
+      room.round.status = 'closed';
+      room.lastEnded = room.round.position;
+      return true;
+    }
     if (type === 'correct') {
       if (correctionTarget(room) !== event.position) return false;
       const { position, participantId, field, ok } = event;
@@ -182,6 +192,7 @@ export function createHub({ pool, now = Date.now, setTimer = setTimeout, clearTi
   async function startRound(roomId, room, event) {
     if (room.phase !== 'playing' || event.position >= room.game.total || room.round?.position === event.position) return false;
     // Nouvelle chanson ou retour sur une précédente : délai complet, et ses points repassent en attente
+    if (room.round) room.lastEnded = room.round.position;
     await resetValidations(pool, room.game.id, event.position);
     if (room.revealed.delete(event.position)) await unreveal(pool, room.game.id, event.position);
     const durationMs = room.game.timer === '30s' ? EXTRACT_ANSWER_MS : event.durationMs;

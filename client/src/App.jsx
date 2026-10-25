@@ -48,11 +48,12 @@ export default function App() {
     const { gameId, round } = live.current;
     if (!gameId) return;
     sendRoom({ type: 'game:start', gameId });
-    if (round) sendRoom({ type: 'round:start', ...round });
-    // Dernière phase connue avant la coupure (utile si le serveur a redémarré entre-temps)
+    // Dernière phase connue avant la coupure (utile si le serveur a redémarré entre-temps) ;
+    // hors du jeu, on ne rejoue pas la manche, qui remettrait sa correction à zéro
     const last = getRoomState().state;
     if (last?.phase === 'correcting') sendRoom({ type: 'correction:start', position: last.correction.position });
-    if (last?.phase === 'final') sendRoom({ type: 'game:final' });
+    else if (last?.phase === 'final') sendRoom({ type: 'game:final' });
+    else if (round) sendRoom({ type: 'round:start', ...round });
   });
 
   useEffect(() => {
@@ -60,14 +61,25 @@ export default function App() {
     loadSession();
   }, []);
 
-  // Page du créateur rechargée en pleine partie : le lecteur est perdu, on termine proprement
-  // la partie restée ouverte côté serveur pour débloquer les participants
-  const orphanGameId = host.live.state?.game?.id;
+  const roomState = host.live.state;
+  const phase = roomState?.phase;
+  const roomGameId = roomState?.game?.id;
+  const [dismissed, setDismissed] = useState(null);
+
+  // Page du créateur rechargée pendant le jeu : le lecteur est perdu, on termine proprement
+  // la partie restée ouverte côté serveur pour débloquer les participants.
+  // En correction ou au classement, le lecteur n'est pas nécessaire : le créateur reprend la main.
   useEffect(() => {
-    if (!orphanGameId || orphanGameId === live.current.gameId) return;
+    if (phase !== 'playing' || roomGameId === live.current.gameId) return;
     sendRoom({ type: 'game:end' });
-    endGame(orphanGameId).catch(() => {});
-  }, [orphanGameId]);
+    endGame(roomGameId).catch(() => {});
+  }, [phase, roomGameId]);
+
+  // Correction et classement : la musique s'arrête ; la partie est enregistrée dès le classement
+  useEffect(() => {
+    if (phase === 'correcting' || phase === 'final') pause();
+    if (phase === 'final') endGame(roomGameId).catch(() => {});
+  }, [phase, roomGameId]);
 
   async function startGame(tracks, title, { gameId, timer, start, reviewUris }) {
     console.log(`[start] lancement de la partie — ${tracks.length} sons`);
@@ -100,12 +112,18 @@ export default function App() {
     pause();
     sendRoom({ type: 'game:end' });
     live.current = { gameId: null, round: null };
-    endGame(screen.gameId).catch(() => {});
+    endGame(screen.gameId ?? roomGameId).catch(() => {});
+    setScreen({ name: 'create' });
+  }
+
+  // Quitter le classement : les participants le gardent jusqu'à la partie suivante
+  function leaveFinal() {
+    setDismissed(roomGameId);
+    live.current = { gameId: null, round: null };
     setScreen({ name: 'create' });
   }
 
   const toCreate = () => setScreen({ name: 'create' });
-  const roomState = host.live.state;
   const openJoin = () => {
     history.pushState({}, '', '/r/');
     setJoin('');
@@ -125,7 +143,7 @@ export default function App() {
     content = <LinkSpotify user={session.user} onJoin={openJoin} />;
   } else if (screen.name === 'profile') {
     content = <Profile user={session.user} onBack={toCreate} />;
-  } else if (screen.name === 'player' && roomState?.phase === 'correcting') {
+  } else if (phase === 'correcting') {
     const { position } = roomState.correction;
     content = (
       <Screen title="Correction" onBack={leaveGame}>
@@ -134,10 +152,10 @@ export default function App() {
           onNext={() => sendRoom({ type: 'correction:next' })} />
       </Screen>
     );
-  } else if (screen.name === 'player' && roomState?.phase === 'final') {
+  } else if (phase === 'final' && roomGameId !== dismissed) {
     content = (
-      <Screen title="Fin de partie" onBack={leaveGame}>
-        <Scoreboard scores={roomState.scores} participants={roomState.participants} details={roomState.final.details} onClose={leaveGame} />
+      <Screen title="Fin de partie" onBack={leaveFinal}>
+        <Scoreboard scores={roomState.scores} participants={roomState.participants} details={roomState.final.details} onClose={leaveFinal} />
       </Screen>
     );
   } else if (screen.name === 'player') {

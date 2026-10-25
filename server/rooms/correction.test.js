@@ -84,13 +84,13 @@ describe('correction à la volée', () => {
     await ctx.ev({ type: 'correct', position: 0, participantId: ctx.ps[0].id, field: 'title', ok: true });
     await ctx.ev({ type: 'correct', position: 0, participantId: ctx.ps[0].id, field: 'artist', ok: false });
     await ctx.ev({ type: 'correct', position: 0, participantId: ctx.ps[0].id, field: 'artist', ok: true });
+    expect(ctx.seats[0].last().revealed).toEqual([]);
+    expect(ctx.seats[0].last().you.results).toEqual([]);
+    await ctx.ev({ type: 'reveal', position: 0 });
     expect(ctx.seats[1].last().scores).toEqual([
       { id: ctx.ps[0].id, name: 'Équipe A', score: 2, rank: 1 },
       { id: ctx.ps[1].id, name: 'Équipe B', score: 0, rank: 2 },
     ]);
-    expect(ctx.seats[0].last().revealed).toEqual([]);
-    expect(ctx.seats[0].last().you.results).toEqual([]);
-    await ctx.ev({ type: 'reveal', position: 0 });
     expect(ctx.seats[0].last().revealed).toEqual([{ position: 0, name: 'TITRE_SECRET_0', artists: ['ARTISTE_SECRET_0'], albumImage: 'https://i.scdn.co/POCHETTE_0' }]);
     expect(ctx.seats[0].last().you.results).toEqual([{ position: 0, titleOk: true, artistOk: true }]);
     await ctx.ev({ type: 'reveal', position: 1 });
@@ -217,5 +217,51 @@ describe('reprise et confidentialité', () => {
     await ctx.ev({ type: 'game:end' });
     for (const type of ['correction:start', 'correction:next', 'game:final']) await ctx.ev({ type });
     expect(ctx.h.last()).toMatchObject({ game: null, phase: null });
+  });
+});
+
+describe('revue : correction à la volée utilisable', () => {
+  it('verrouille les réponses tout de suite à la demande du créateur', async () => {
+    const ctx = await setup();
+    await play(ctx, 0);
+    await ctx.answer(0, 0, 'T', '');
+    await ctx.ev({ type: 'round:close' });
+    expect(ctx.h.last()).toMatchObject({ round: { status: 'closed' }, correction: { position: 0 } });
+    expect(await ctx.answer(0, 0, 'Trop tard', '')).toBe('closed');
+    expect(pending.size).toBe(0);
+    const count = ctx.h.messages.length;
+    await ctx.ev({ type: 'round:close' });
+    expect(ctx.h.messages.length).toBe(count);
+  });
+
+  it('garde la chanson précédente corrigeable pendant que la suivante joue', async () => {
+    const ctx = await setup();
+    await play(ctx, 0);
+    await ctx.answer(0, 0, 'T', '');
+    await play(ctx, 1);
+    expect(ctx.h.last()).toMatchObject({ round: { position: 1, status: 'open' }, correction: { position: 0 } });
+    await ctx.ev({ type: 'correct', position: 0, participantId: ctx.ps[0].id, field: 'title', ok: true });
+    await ctx.ev({ type: 'reveal', position: 0 });
+    expect(ctx.seats[0].last().revealed.map(r => r.position)).toEqual([0]);
+    await close();
+    expect(ctx.h.last().correction).toEqual({ position: 1 });
+  });
+
+  it('ne compte dans les scores que les chansons révélées', async () => {
+    const ctx = await setup();
+    await play(ctx, 0);
+    await ctx.answer(0, 0, 'T', '');
+    await close();
+    await ctx.ev({ type: 'correct', position: 0, participantId: ctx.ps[0].id, field: 'title', ok: true });
+    expect(ctx.seats[1].last().scores.map(s => s.score)).toEqual([0, 0]);
+    await ctx.ev({ type: 'reveal', position: 0 });
+    expect(ctx.seats[1].last().scores.find(s => s.id === ctx.ps[0].id).score).toBe(1);
+  });
+
+  it('garde le classement final jusqu\'à la partie suivante', async () => {
+    const ctx = await setup();
+    await ctx.ev({ type: 'game:final' });
+    await ctx.ev({ type: 'round:close' });
+    expect(ctx.seats[0].last().phase).toBe('final');
   });
 });

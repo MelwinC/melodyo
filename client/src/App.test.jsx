@@ -245,7 +245,7 @@ describe('App', () => {
 
   it('termine la partie orpheline laissée par un rechargement de la page du créateur', () => {
     store.snapshot = { status: 'ready', user };
-    host.value.live = { connected: true, state: { participants: [], game: { id: 'ancienne' } } };
+    host.value.live = { connected: true, state: { participants: [], game: { id: 'ancienne' }, phase: 'playing' } };
     render(<App />);
     expect(sendRoom).toHaveBeenCalledWith({ type: 'game:end' });
     expect(endGame).toHaveBeenCalledWith('ancienne');
@@ -256,7 +256,7 @@ describe('App', () => {
     ensurePlayer.mockReturnValue(new Promise(() => {}));
     const { rerender } = render(<App />);
     await userEvent.click(screen.getByText('écran création Mel'));
-    host.value = { ...host.value, live: { connected: true, state: { participants: [], game: { id: 'g1' } } } };
+    host.value = { ...host.value, live: { connected: true, state: { participants: [], game: { id: 'g1' }, phase: 'playing' } } };
     sendRoom.mockClear();
     rerender(<App />);
     expect(sendRoom).not.toHaveBeenCalledWith({ type: 'game:end' });
@@ -285,19 +285,48 @@ describe('App', () => {
       expect(sendRoom).toHaveBeenLastCalledWith({ type: 'correction:next' });
     });
 
-    it('affiche le classement final puis termine la partie', async () => {
+    it('affiche le classement final, met la musique en pause et laisse le classement aux joueurs', async () => {
       await playing({ phase: 'final', scores: [{ id: 'p1' }], final: { details: { p1: [] } } });
-      await userEvent.click(screen.getByText('classement 1 1'));
+      expect(pause).toHaveBeenCalled();
       expect(endGame).toHaveBeenCalledWith('g1');
+      sendRoom.mockClear();
+      await userEvent.click(screen.getByText('classement 1 1'));
+      expect(sendRoom).not.toHaveBeenCalledWith({ type: 'game:end' });
       expect(screen.getByText('écran création Mel')).toBeInTheDocument();
+    });
+
+    it('reprend la correction ou le classement après un rechargement de la page', async () => {
+      store.snapshot = { status: 'ready', user };
+      host.value = { ...host.value, live: { connected: true, state: { participants: [], game: { id: 'g7' }, phase: 'correcting', correction: { position: 3 } } } };
+      const { unmount } = render(<App />);
+      expect(screen.getByText('correction 3')).toBeInTheDocument();
+      expect(sendRoom).not.toHaveBeenCalledWith({ type: 'game:end' });
+      await userEvent.click(screen.getByRole('button', { name: '← Retour' }));
+      expect(endGame).toHaveBeenCalledWith('g7');
+      unmount();
+      host.value = { ...host.value, live: { connected: true, state: { participants: [], game: { id: 'g7' }, phase: 'final', scores: [], final: { details: {} } } } };
+      render(<App />);
+      expect(screen.getByText('classement 0 0')).toBeInTheDocument();
+    });
+
+    it('quitte la correction en terminant la partie', async () => {
+      await playing({ phase: 'correcting', correction: { position: 0 } });
+      await userEvent.click(screen.getByRole('button', { name: '← Retour' }));
+      expect(sendRoom).toHaveBeenCalledWith({ type: 'game:end' });
+      expect(endGame).toHaveBeenCalledWith('g1');
     });
 
     it('renvoie la phase de correction après une coupure', async () => {
       await playing({ phase: 'playing' });
       sendRoom.mockClear();
       roomStore.state = { phase: 'correcting', correction: { position: 4 } };
+      startQueue.mock.calls[0][1].onTrackStart(1, 9000, true);
+      sendRoom.mockClear();
       host.onReconnect();
-      expect(sendRoom).toHaveBeenLastCalledWith({ type: 'correction:start', position: 4 });
+      expect(sendRoom.mock.calls).toEqual([
+        [{ type: 'game:start', gameId: 'g1' }],
+        [{ type: 'correction:start', position: 4 }],
+      ]);
       roomStore.state = { phase: 'final' };
       host.onReconnect();
       expect(sendRoom).toHaveBeenLastCalledWith({ type: 'game:final' });

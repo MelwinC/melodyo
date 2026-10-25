@@ -17,6 +17,7 @@ const hostSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('correction:start'), position: z.number().int().min(0).optional() }),
   z.object({ type: z.literal('correction:next') }),
   z.object({ type: z.literal('game:final') }),
+  z.object({ type: z.literal('round:close') }),
 ]);
 const answerSchema = z.object({
   type: z.literal('answer'),

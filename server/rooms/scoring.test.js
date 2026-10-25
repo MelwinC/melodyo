@@ -27,6 +27,9 @@ describe('scores', () => {
     await setValidation(pool, { gameId, position: 0, participantId: a.id, field: 'title', ok: true });
     await setValidation(pool, { gameId, position: 0, participantId: a.id, field: 'artist', ok: true });
     await setValidation(pool, { gameId, position: 1, participantId: a.id, field: 'title', ok: false });
+    expect((await getScores(pool, gameId, [a.id])).get(a.id)).toBe(0);
+    await markRevealed(pool, gameId, 0);
+    await markRevealed(pool, gameId, 1);
     expect(await getScores(pool, gameId, [a.id, b.id])).toEqual(new Map([[a.id, 2], [b.id, 0]]));
     expect(await getScores(pool, gameId, [b.id])).toEqual(new Map([[b.id, 0]]));
   });

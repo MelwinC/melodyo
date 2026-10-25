@@ -1,8 +1,10 @@
-// 1 point pour un titre validé, 1 pour un artiste validé ; 0 pour un participant sans réponse
+// 1 point pour un titre validé, 1 pour un artiste validé, sur les seules chansons révélées
+// (sinon le score trahirait la correction avant la révélation) ; 0 pour un participant sans réponse
 export async function getScores(pool, gameId, participantIds) {
   const { rows } = await pool.query(
-    `SELECT participant_id, sum((title_ok IS TRUE)::int + (artist_ok IS TRUE)::int)::int AS score
-     FROM answers WHERE game_id = $1 GROUP BY participant_id`,
+    `SELECT a.participant_id, sum((a.title_ok IS TRUE)::int + (a.artist_ok IS TRUE)::int)::int AS score
+     FROM answers a JOIN game_reveals r ON r.game_id = a.game_id AND r.position = a.position
+     WHERE a.game_id = $1 GROUP BY a.participant_id`,
     [gameId],
   );
   const scores = new Map(participantIds.map(id => [id, 0]));

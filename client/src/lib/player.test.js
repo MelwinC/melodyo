@@ -437,4 +437,16 @@ describe('options de lecture', () => {
     p.emit('player_state_changed', playingState('a', { position: 35500 }));
     expect(p.pause).toHaveBeenCalledOnce();
   });
+
+  it('ne signale pas la pause automatique de l\'extrait au serveur, mais bien la reprise', async () => {
+    const onPlayback = vi.fn();
+    const p = await queued({ timer: '30s', onPlayback });
+    p.emit('player_state_changed', playingState('a'));
+    vi.advanceTimersByTime(30000);
+    p.emit('player_state_changed', playingState('a', { position: 30000 }));
+    p.emit('player_state_changed', playingState('a', { paused: true, position: 30000 }));
+    p.emit('player_state_changed', playingState('a', { position: 30100 }));
+    p.emit('player_state_changed', playingState('a', { paused: true, position: 31000 }));
+    expect(onPlayback.mock.calls).toEqual([[false], [false], [true]]);
+  });
 });

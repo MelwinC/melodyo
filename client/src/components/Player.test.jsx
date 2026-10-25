@@ -233,8 +233,20 @@ describe('Player', () => {
       await userEvent.click(screen.getAllByRole('button', { name: '👁 Révéler' })[0]);
       expect(sendRoom).toHaveBeenCalledWith({ type: 'reveal', position: 2 });
       expect(cover()).not.toHaveClass('blur');
+      expect(screen.queryByRole('button', { name: '🏆 Classement' })).toBeNull();
+    });
+
+    it('propose le classement seulement sur la dernière chanson', async () => {
+      store.snapshot = { ...store.snapshot, index: 19, total: 20 };
+      ready({ room: roomOf() });
       await userEvent.click(screen.getByRole('button', { name: '🏆 Classement' }));
       expect(sendRoom).toHaveBeenLastCalledWith({ type: 'game:final' });
+    });
+
+    it('verrouille les réponses de la chanson en cours', async () => {
+      ready({ room: roomOf({ correction: null, round: { position: 2, status: 'open', remainingMs: 5000, paused: false } }) });
+      await userEvent.click(screen.getByRole('button', { name: '🔒 Verrouiller les réponses' }));
+      expect(sendRoom).toHaveBeenCalledWith({ type: 'round:close' });
     });
 
     it('révèle localement sans prévenir le serveur quand la manche est encore ouverte', async () => {
@@ -251,7 +263,11 @@ describe('Player', () => {
       expect(cover()).toHaveClass('blur');
     });
 
-    it('à la fin : propose de lancer la correction', async () => {
+    it('à la fin : propose de lancer la correction à la dernière chanson', async () => {
+      const { unmount } = ready({ room: roomOf({ game: { id: 'g', total: 20, correction: 'end' }, correction: null }) });
+      expect(screen.queryByRole('button', { name: '✅ Corriger les réponses' })).toBeNull();
+      unmount();
+      store.snapshot = { ...store.snapshot, index: 19, total: 20 };
       ready({ room: roomOf({ game: { id: 'g', total: 20, correction: 'end' }, correction: null }) });
       expect(screen.queryByRole('button', { name: 'Titre correct' })).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: '✅ Corriger les réponses' }));

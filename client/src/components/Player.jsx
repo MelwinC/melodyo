@@ -143,7 +143,11 @@ export default function Player({ title, status, loadingText, error, onExit, onBa
             <Correction state={room.state} onReveal={revealPosition}
               onCorrect={(participantId, field, ok) => sendRoom({ type: 'correct', position: correction.position, participantId, field, ok })} />
           )}
-          {roomGame && room.state.phase === 'playing' && (
+          {round?.status === 'open' && participants.length > 0 && (
+            <button className="btn btn-ghost" onClick={() => sendRoom({ type: 'round:close' })}>🔒 Verrouiller les réponses</button>
+          )}
+          {/* Fin de partie (sans retour possible) : proposée seulement sur la dernière chanson */}
+          {roomGame && room.state.phase === 'playing' && snap.index === snap.total - 1 && (
             roomGame.correction === 'end'
               ? <button className="btn btn-ghost" onClick={() => sendRoom({ type: 'correction:start' })}>✅ Corriger les réponses</button>
               : <button className="btn btn-ghost" onClick={() => sendRoom({ type: 'game:final' })}>🏆 Classement</button>
