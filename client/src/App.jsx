@@ -30,8 +30,8 @@ export default function App() {
       .catch(() => setScreen({ name: 'login' }));
   }, []);
 
-  async function startBlindTest(tracks, title) {
-    console.log(`[start] lancement blind test — ${tracks.length} sons`);
+  async function startGame(tracks, title) {
+    console.log(`[start] lancement de la partie — ${tracks.length} sons`);
     const show = (status, extra = {}) => setScreen({ name: 'player', title, status, ...extra });
     try {
       show('loading', { loadingText: 'Connexion au lecteur Spotify…' });
@@ -52,7 +52,7 @@ export default function App() {
   return (
     <>
       {screen.name === 'login' && <Login />}
-      {screen.name === 'create' && <Create onStart={startBlindTest} />}
+      {screen.name === 'create' && <Create onStart={startGame} />}
       {screen.name === 'player' && (
         <Player {...screen} onExit={exitPlayer} onBack={() => setScreen({ name: 'create' })} />
       )}

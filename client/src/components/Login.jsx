@@ -4,7 +4,7 @@ export default function Login() {
       <div className="login-card">
         <div className="login-icon">🎵</div>
         <h1>Melodyo</h1>
-        <p>Connectez-vous avec Spotify pour créer et jouer vos blind tests</p>
+        <p>Connectez-vous avec Spotify pour lancer une partie de Melodyo</p>
         <a href="/login" className="btn btn-green btn-full">Se connecter avec Spotify</a>
       </div>
     </div>

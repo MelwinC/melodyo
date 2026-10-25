@@ -111,7 +111,7 @@ export default function Create({ onStart }) {
           </div>
         </div>
         <button className="btn btn-green btn-full" disabled={!selected.length || pending || !!progress} onClick={doCreate}>
-          ▶ Lancer le Blind Test
+          ▶ Lancer la partie
         </button>
         {progress && (
           <div className="progress-box show">
