@@ -179,3 +179,14 @@ describe('limites de tentatives', () => {
     expect((await attempt()).status).toBe(401);
   });
 });
+
+describe('GET /api/me/stats', () => {
+  it('exige une session et renvoie les stats du compte', async () => {
+    expect((await request(app).get('/api/me/stats')).status).toBe(401);
+    const agent = request.agent(app);
+    await signUp(agent);
+    const res = await agent.get('/api/me/stats');
+    expect(res.status).toBe(200);
+    expect(res.body.stats).toMatchObject({ games: 0, themes: [] });
+  });
+});
