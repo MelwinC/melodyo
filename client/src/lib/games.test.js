@@ -15,6 +15,7 @@ describe('API des parties', () => {
   it.each([
     ['fetchReview', [], 'GET', '/api/review', undefined, { tracks: [1] }, [1]],
     ['createGame', [{ s: 1 }, [2]], 'POST', '/api/games', { settings: { s: 1 }, tracks: [2] }, { id: 'g' }, 'g'],
+    ['createGame', [{ s: 1 }, [2], 'r1'], 'POST', '/api/games', { settings: { s: 1 }, tracks: [2], roomId: 'r1' }, { id: 'g' }, 'g'],
     ['listGames', [], 'GET', '/api/games', undefined, { games: [3] }, [3]],
     ['getGame', ['g'], 'GET', '/api/games/g', undefined, { game: 4 }, 4],
     ['markPlayed', ['g', 2], 'POST', '/api/games/g/played', { position: 2 }, null, null],

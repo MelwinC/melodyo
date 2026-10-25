@@ -547,3 +547,19 @@ input[type="range"] {
 .home-links { display: flex; gap: 8px; margin-bottom: 20px; }
 .home-links .btn { flex: 1; }
 .btn-review[aria-pressed="true"] { border-color: var(--green); color: var(--green); }
+
+/* ── ROOM ── */
+.lobby { background: var(--surface); border-radius: var(--radius); padding: 16px; margin-bottom: 20px; }
+.lobby-join { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.qr-code { background: #fff; border-radius: 8px; padding: 6px; }
+.lobby-label { font-size: 12px; color: var(--text2); font-weight: 600; margin: 4px 0; }
+.lobby-code { font-size: 34px; font-weight: 800; letter-spacing: 6px; font-variant-numeric: tabular-nums; }
+.lobby-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.lobby-empty { color: var(--text2); font-size: 13px; margin-top: 12px; }
+.participants { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.participants li {
+  display: flex; align-items: center; gap: 6px; background: var(--surface2);
+  border-radius: 50px; padding: 3px 12px 3px 3px; font-size: 13px; font-weight: 600;
+}
+.participants li.offline { opacity: .45; }
+.round-status { display: flex; gap: 16px; justify-content: center; color: var(--text2); font-size: 13px; font-weight: 600; }

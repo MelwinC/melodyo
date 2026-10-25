@@ -193,4 +193,21 @@ describe('Player', () => {
     expect(addToReview).toHaveBeenCalledWith({ uri: 'q2', name: 'Titre q2', artists: ['A1', 'A2'], albumImage: 'https://i.scdn.co/q2', themeId: '80s' });
     expect(screen.getByRole('button', { name: '✓ À revoir' })).toHaveAttribute('aria-pressed', 'true');
   });
+
+  it('affiche le nombre de réponses et le temps restant de la manche', () => {
+    const round = { position: 2, status: 'open', remainingMs: 65000, paused: false };
+    const room = { state: { round, participants: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], answered: ['a'] }, receivedAt: Date.now() };
+    const { rerender } = ready({ room });
+    expect(screen.getByText('1/3 ont répondu')).toBeInTheDocument();
+    expect(screen.getByText('⏱ 1:05')).toBeInTheDocument();
+    rerender(<Player title="📻" status="ready" onExit={vi.fn()} onBack={vi.fn()} room={{ ...room, state: { ...room.state, round: { ...round, status: 'closed' } } }} />);
+    expect(screen.getByText('Réponses verrouillées')).toBeInTheDocument();
+  });
+
+  it('n\'affiche rien de la room sans participant ni manche', () => {
+    ready({ room: { state: { round: null, participants: [], answered: [] }, receivedAt: 0 } });
+    expect(screen.queryByText(/ont répondu/)).toBeNull();
+    ready({ room: { state: { round: { status: 'open', remainingMs: 1, paused: false }, participants: [], answered: [] }, receivedAt: 0 } });
+    expect(screen.queryByText(/ont répondu/)).toBeNull();
+  });
 });

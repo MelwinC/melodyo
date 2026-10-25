@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { findTheme } from '../lib/themes.js';
 import { toTrackInput } from '../lib/tracks.js';
 import { useReview } from './useReview.js';
+import { fmtClock, useCountdown } from './useCountdown.js';
 import {
   getPlayerSnapshot, subscribePlayer, pollPosition,
   togglePlay, nextTrack, previousTrack, seek, seekBy,
@@ -15,9 +16,12 @@ function fmtTime(ms) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-export default function Player({ title, status, loadingText, error, onExit, onBack, tracks, reviewUris }) {
+export default function Player({ title, status, loadingText, error, onExit, onBack, tracks, reviewUris, room }) {
   const snap = useSyncExternalStore(subscribePlayer, getPlayerSnapshot);
   const review = useReview(reviewUris ?? new Set());
+  const round = room?.state?.round;
+  const participants = room?.state?.participants ?? [];
+  const answerMs = useCountdown(round, room?.receivedAt);
   const [revealed, setRevealed] = useState(false);
   const [hintShown, setHintShown] = useState(false);
 
@@ -89,6 +93,12 @@ export default function Player({ title, status, loadingText, error, onExit, onBa
           </div>
 
           {snap.remaining != null && <div className="extract-timer">{fmtCountdown(snap.remaining)}</div>}
+          {round && participants.length > 0 && (
+            <div className="round-status">
+              <span>{room.state.answered.length}/{participants.length} ont répondu</span>
+              <span>{round.status === 'open' ? `⏱ ${fmtClock(answerMs)}` : 'Réponses verrouillées'}</span>
+            </div>
+          )}
 
           <div className={`track-info${revealed ? ' show' : ''}`}>
             <div className="track-artists">{revealed && (track?.artists || []).map(a => a.name).join(', ')}</div>

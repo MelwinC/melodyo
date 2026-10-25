@@ -6,6 +6,7 @@ import { activate, disconnect, ensurePlayer, isFirefox } from '../lib/player.js'
 import { logout } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 import Avatar from './Avatar.jsx';
+import Lobby from './Lobby.jsx';
 
 // Nombre de sons d'un thème : un nombre, 'loading' ou 'error'
 function countLabel(count) {
@@ -29,7 +30,7 @@ function Choice({ label, value, options, onChange }) {
   );
 }
 
-export default function Create({ user, onStart, onProfile, onHistory, onReview }) {
+export default function Create({ user, onStart, onProfile, onHistory, onReview, room, roomState, onCloseRoom }) {
   const [selected, setSelected] = useState([]);
   const [pools, setPools] = useState(getThemePools);
   const [context, setContext] = useState(null);
@@ -86,7 +87,7 @@ export default function Create({ user, onStart, onProfile, onHistory, onReview }
       const tracks = await buildTracks(selected, value, (label, pct) => setProgress({ label, pct }), context);
       if (!tracks.length) throw new Error('Aucun son trouvé pour ces thèmes.');
       setProgress({ label: 'Lancement…', pct: 95 });
-      const gameId = await createGame({ themes: selected, perTheme: value, timer, start }, tracks.map(toTrackInput));
+      const gameId = await createGame({ themes: selected, perTheme: value, timer, start }, tracks.map(toTrackInput), room?.id);
       onStart(tracks, selected.map(id => findTheme(id).emoji).join(' '), {
         gameId, timer, start, reviewUris: new Set(context.review.map(r => r.uri)),
       });
@@ -106,6 +107,7 @@ export default function Create({ user, onStart, onProfile, onHistory, onReview }
         <h1>🎵 Melodyo</h1>
         <button className="btn btn-ghost btn-sm" onClick={() => { disconnect(); logout(); }}>Déco.</button>
       </header>
+      {room && <Lobby room={room} state={roomState} onClose={onCloseRoom} />}
       <div className="home-links">
         <button className="btn btn-ghost btn-sm" onClick={onHistory}>📜 Historique</button>
         <button className="btn btn-ghost btn-sm" onClick={onReview}>⭐ À revoir</button>

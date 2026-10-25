@@ -64,6 +64,8 @@ export function createHub({ pool, now = Date.now, setTimer = setTimeout, clearTi
   async function hostEvent(roomId, event) {
     const room = roomOf(roomId);
     if (event.type === 'game:start') {
+      // Reprise après reconnexion du créateur : la partie en cours continue telle quelle
+      if (room.game?.id === event.gameId) return;
       const game = await getRoomGame(pool, roomId, event.gameId);
       if (!game) return;
       stopTimer(room);
@@ -76,7 +78,7 @@ export function createHub({ pool, now = Date.now, setTimer = setTimeout, clearTi
     } else if (!room.game) {
       return;
     } else if (event.type === 'round:start') {
-      if (event.position >= room.game.total) return;
+      if (event.position >= room.game.total || room.round?.position === event.position) return;
       // Nouvelle chanson ou retour sur une précédente : la manche (ré)ouvre avec un délai complet
       const durationMs = room.game.timer === '30s' ? EXTRACT_ANSWER_MS : event.durationMs;
       room.round = { position: event.position, status: 'open', clock: openClock(now(), durationMs) };

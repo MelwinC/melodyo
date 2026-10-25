@@ -337,11 +337,29 @@ describe('options de lecture', () => {
     expect(mod.getPlayerSnapshot()).toMatchObject({ timer: 'full', remaining: null });
   });
 
-  it('signale chaque chanson une seule fois, même après un retour arrière', async () => {
+  it('signale chaque chanson avec sa durée restante depuis le départ', async () => {
+    const onTrackStart = vi.fn();
+    const p = await queued({ onTrackStart, start: 'middle' });
+    for (const uri of ['a', 'b', 'a', 'zzz']) p.emit('player_state_changed', playingState(uri));
+    expect(onTrackStart.mock.calls).toEqual([[0, 100000, true], [1, 100000, true], [0, 100000, false]]);
+  });
+
+  it('donne la durée complète en mode début', async () => {
     const onTrackStart = vi.fn();
     const p = await queued({ onTrackStart });
-    for (const uri of ['a', 'b', 'a', 'zzz']) p.emit('player_state_changed', playingState(uri));
-    expect(onTrackStart.mock.calls).toEqual([[0], [1]]);
+    p.emit('player_state_changed', playingState('a'));
+    expect(onTrackStart).toHaveBeenCalledWith(0, 200000, true);
+  });
+
+  it('signale les pauses et reprises', async () => {
+    const onPlayback = vi.fn();
+    const p = await queued({ onPlayback });
+    p.emit('player_state_changed', playingState('a'));
+    p.emit('player_state_changed', playingState('a', { position: 10 }));
+    p.emit('player_state_changed', playingState('a', { paused: true }));
+    p.emit('player_state_changed', playingState('a', { paused: true, position: 20 }));
+    p.emit('player_state_changed', playingState('a'));
+    expect(onPlayback.mock.calls).toEqual([[false], [true], [false]]);
   });
 
   it('met en pause au bout de 30 s de lecture', async () => {

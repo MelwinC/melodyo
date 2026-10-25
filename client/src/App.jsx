@@ -1,6 +1,7 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { endGame, markPlayed } from './lib/games.js';
 import { ensurePlayer, pause, startQueue } from './lib/player.js';
+import { sendRoom } from './lib/room.js';
 import { getSession, loadSession, subscribeSession } from './lib/session.js';
 import { toast } from './lib/toast.js';
 import Auth from './components/Auth.jsx';
@@ -12,6 +13,7 @@ import Player from './components/Player.jsx';
 import Profile from './components/Profile.jsx';
 import ReviewList from './components/ReviewList.jsx';
 import Toast from './components/Toast.jsx';
+import { useHostRoom } from './components/useHostRoom.js';
 
 const URL_ERRORS = {
   access_denied: 'Connexion Spotify refusée',
@@ -29,6 +31,14 @@ function showUrlError() {
 export default function App() {
   const session = useSyncExternalStore(subscribeSession, getSession);
   const [screen, setScreen] = useState({ name: 'create' });
+  // Partie et chanson en cours, renvoyées au serveur si la connexion temps réel se rétablit
+  const live = useRef({ gameId: null, round: null });
+  const host = useHostRoom(session.user, true, () => {
+    const { gameId, round } = live.current;
+    if (!gameId) return;
+    sendRoom({ type: 'game:start', gameId });
+    if (round) sendRoom({ type: 'round:start', ...round });
+  });
 
   useEffect(() => {
     showUrlError();
@@ -42,8 +52,19 @@ export default function App() {
       show('loading', { loadingText: 'Connexion au lecteur Spotify…' });
       await ensurePlayer();
       show('loading', { loadingText: 'Lancement…' });
-      // Chaque chanson réellement jouée est enregistrée : elle sera exclue de la partie suivante
-      await startQueue(tracks, { timer, start, onTrackStart: i => markPlayed(gameId, i).catch(() => {}) });
+      live.current = { gameId, round: null };
+      sendRoom({ type: 'game:start', gameId });
+      await startQueue(tracks, {
+        timer,
+        start,
+        onTrackStart: (position, durationMs, firstTime) => {
+          // Chaque chanson réellement jouée est enregistrée : elle sera exclue de la partie suivante
+          if (firstTime) markPlayed(gameId, position).catch(() => {});
+          live.current.round = { position, durationMs };
+          sendRoom({ type: 'round:start', position, durationMs });
+        },
+        onPlayback: paused => sendRoom({ type: 'playback', paused }),
+      });
       show('ready');
     } catch (e) {
       show('error', { error: e.message });
@@ -53,6 +74,8 @@ export default function App() {
   // Quitter la partie : terminée si toutes les chansons ont été jouées, interrompue sinon
   function leaveGame() {
     pause();
+    sendRoom({ type: 'game:end' });
+    live.current = { gameId: null, round: null };
     endGame(screen.gameId).catch(() => {});
     setScreen({ name: 'create' });
   }
@@ -68,7 +91,7 @@ export default function App() {
   } else if (screen.name === 'profile') {
     content = <Profile user={session.user} onBack={toCreate} />;
   } else if (screen.name === 'player') {
-    content = <Player {...screen} onExit={leaveGame} onBack={leaveGame} />;
+    content = <Player {...screen} room={host.live} onExit={leaveGame} onBack={leaveGame} />;
   } else if (screen.name === 'history') {
     content = <History onOpen={gameId => setScreen({ name: 'game', gameId })} onBack={toCreate} />;
   } else if (screen.name === 'game') {
@@ -78,6 +101,7 @@ export default function App() {
   } else {
     content = (
       <Create user={session.user} onStart={startGame} onProfile={() => setScreen({ name: 'profile' })}
+        room={host.room} roomState={host.live.state} onCloseRoom={host.close}
         onHistory={() => setScreen({ name: 'history' })} onReview={() => setScreen({ name: 'review' })} />
     );
   }

@@ -15,6 +15,7 @@ let started = new Set();
 let playedMs = 0;
 let lastTick = null;
 let extractDone = false;
+let lastPaused = null;
 
 // Temps d'écoute de l'extrait : ne s'écoule que pendant la lecture (la pause l'arrête, un saut de ±10 s ne change rien)
 function extractPatch(paused) {
@@ -119,10 +120,11 @@ async function connectPlayer(onReady, onError) {
 export const isFirefox = /firefox|fxios/i.test(navigator.userAgent);
 
 /* ── LECTURE ── */
-export async function startQueue(tracks, { timer = 'full', start = 'start', onTrackStart = () => {} } = {}) {
+export async function startQueue(tracks, { timer = 'full', start = 'start', onTrackStart = () => {}, onPlayback = () => {} } = {}) {
   queue = tracks;
-  options = { timer, start, onTrackStart };
+  options = { timer, start, onTrackStart, onPlayback };
   started = new Set();
+  lastPaused = null;
   playedMs = 0;
   lastTick = null;
   update({
@@ -162,13 +164,19 @@ function onPlayerStateChanged(state) {
     playedMs = 0;
     lastTick = null;
     extractDone = false;
-    if (options.start === 'middle') {
-      player.seek(Math.max(0, Math.floor(state.duration / 2) - (options.timer === '30s' ? 15000 : 0)));
-    }
-    if (idx >= 0 && !started.has(idx)) {
+    const startAt = options.start === 'middle'
+      ? Math.max(0, Math.floor(state.duration / 2) - (options.timer === '30s' ? 15000 : 0))
+      : 0;
+    if (options.start === 'middle') player.seek(startAt);
+    // Chaque démarrage (retour arrière compris) rouvre la manche ; seule la première écoute compte comme jouée
+    if (idx >= 0) {
+      options.onTrackStart(idx, state.duration - startAt, !started.has(idx));
       started.add(idx);
-      options.onTrackStart(idx);
     }
+  }
+  if (options.onPlayback && state.paused !== lastPaused) {
+    lastPaused = state.paused;
+    options.onPlayback(state.paused);
   }
   update({ ...patch, ...extractPatch(state.paused) });
 }

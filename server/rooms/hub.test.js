@@ -136,6 +136,28 @@ describe('manches', () => {
     expect(afterClose).toBeGreaterThan(before);
   });
 
+  it('ignore une reprise qui répète la partie et la chanson en cours (reconnexion du créateur)', async () => {
+    const { room, gameId, a, pa } = await setup();
+    await hub.hostEvent(room.id, { type: 'game:start', gameId });
+    await hub.hostEvent(room.id, { type: 'round:start', position: 0, durationMs: 1 });
+    await hub.answer(room.id, a.id, { position: 0, title: 'Gardée', artist: '' });
+    await timers.advance(30000);
+    await hub.hostEvent(room.id, { type: 'game:start', gameId });
+    await hub.hostEvent(room.id, { type: 'round:start', position: 0, durationMs: 1 });
+    await hub.participantsChanged(room.id);
+    expect(pa.last().round).toMatchObject({ position: 0, status: 'open', remainingMs: 60000 });
+    expect(pa.last().you.answer).toEqual({ title: 'Gardée', artist: '' });
+  });
+
+  it('recrée la manche après un redémarrage du serveur', async () => {
+    const { room, gameId, pa } = await setup();
+    const restarted = createHub({ pool, now: () => clock.now, setTimer: timers.setTimer, clearTimer: timers.clearTimer });
+    await restarted.connect(room.id, pa);
+    await restarted.hostEvent(room.id, { type: 'game:start', gameId });
+    await restarted.hostEvent(room.id, { type: 'round:start', position: 1, durationMs: 1 });
+    expect(pa.last().round).toMatchObject({ position: 1, status: 'open' });
+  });
+
   it('termine la partie', async () => {
     const { room, gameId, pa } = await setup();
     await hub.hostEvent(room.id, { type: 'game:start', gameId });

@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({ firefox: false }));
 
 vi.mock('../lib/tracks.js', async importOriginal => ({ ...(await importOriginal()), buildTracks: vi.fn(), getThemePools: vi.fn(), loadThemePool: vi.fn() }));
 vi.mock('../lib/games.js', () => ({ createGame: vi.fn(), fetchExclusions: vi.fn(), fetchReview: vi.fn() }));
+vi.mock('./Lobby.jsx', () => ({ default: ({ room, state, onClose }) => <button onClick={onClose}>salon {room.code} {state?.participants.length}</button> }));
 vi.mock('../lib/toast.js', () => ({ toast: vi.fn() }));
 vi.mock('../lib/session.js', () => ({ logout: vi.fn() }));
 vi.mock('../lib/player.js', () => ({
@@ -189,6 +190,7 @@ describe('Create', () => {
     expect(createGame).toHaveBeenCalledWith(
       { themes: ['80s'], perTheme: 5, timer: '30s', start: 'middle' },
       expect.arrayContaining([expect.objectContaining({ uri: 'spotify:track:u0', artists: ['A'], themeId: '80s' })]),
+      undefined,
     );
     expect(onStart.mock.calls[0][2]).toEqual({ gameId: 'g1', timer: '30s', start: 'middle', reviewUris: new Set(['spotify:track:r']) });
   });
@@ -223,5 +225,18 @@ describe('Create', () => {
     await userEvent.click(screen.getByRole('button', { name: '⭐ À revoir' }));
     expect(onHistory).toHaveBeenCalled();
     expect(onReview).toHaveBeenCalled();
+  });
+
+  it('affiche le salon de la room et y rattache la partie', async () => {
+    getThemePools.mockReturnValue({ '80s': pool(120) });
+    buildTracks.mockResolvedValue(pool(5));
+    const onCloseRoom = vi.fn();
+    render(<Create user={user} onProfile={vi.fn()} onStart={vi.fn()} room={{ id: 'r1', code: 'ABC234' }}
+      roomState={{ participants: [1, 2] }} onCloseRoom={onCloseRoom} />);
+    await userEvent.click(screen.getByRole('button', { name: 'salon ABC234 2' }));
+    expect(onCloseRoom).toHaveBeenCalled();
+    await userEvent.click(card('Années 80'));
+    await userEvent.click(launch());
+    expect(createGame.mock.calls[0][2]).toBe('r1');
   });
 });
