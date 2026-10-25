@@ -91,20 +91,30 @@ function popularFirst(pool) {
 export function toTrackInput(t) {
   return {
     uri: t.uri,
-    name: t.name,
-    artists: t.artists.map(a => a.name),
+    // Bornes du serveur : un titre ou une compilation hors norme ne doit pas bloquer la partie
+    name: t.name.slice(0, 300),
+    artists: t.artists.slice(0, 20).map(a => a.name.slice(0, 200)),
     albumImage: t.album?.images?.[0]?.url ?? null,
     themeId: t._themeId,
     fromReview: Boolean(t._fromReview),
   };
 }
 
-// Sons jouables d'un thème : le pool sans la partie précédente, plus les sons « à revoir » du thème
+// Plus grand nombre de sons qu'un thème peut fournir, avec les mêmes règles que buildTracks :
+// les sons neufs du pool, plus les sons « à revoir » plafonnés à la moitié du quota
 export function availableCount(themeId, pool, excluded, review) {
   const inPool = new Set(pool.map(t => t.uri));
   const toReview = new Set(review.filter(r => r.themeId === themeId).map(r => r.uri));
-  const fromPool = pool.filter(t => !excluded.has(t.uri) || toReview.has(t.uri)).length;
-  return fromPool + [...toReview].filter(uri => !inPool.has(uri)).length;
+  let fresh = pool.filter(t => !excluded.has(t.uri) && !toReview.has(t.uri)).length;
+  let reviewOnly = 0;
+  for (const uri of toReview) {
+    // Un son « à revoir » encore jouable depuis le pool compte comme neuf ; sinon seule la liste peut l'apporter
+    if (inPool.has(uri) && !excluded.has(uri)) fresh++;
+    else reviewOnly++;
+  }
+  let n = fresh + reviewOnly;
+  while (n > fresh + Math.min(reviewOnly, Math.ceil(n / 2))) n--;
+  return n;
 }
 
 // Son « à revoir » remis au format du lecteur (il peut ne plus être dans la playlist)
@@ -129,7 +139,11 @@ export async function buildTracks(themeIds, perTheme, onProgress, { excluded = n
     try {
       const pool = await loadThemePool(theme);
       // Sons « à revoir » d'abord (au plus la moitié du quota), puis des sons neufs
-      const reviewPicks = shuffle(review.filter(r => r.themeId === theme.id))
+      // Priorité aux sons que seule la liste peut apporter (exclus ou sortis de la playlist)
+      const inPool = new Set(pool.map(t => t.uri));
+      const themeReview = review.filter(r => r.themeId === theme.id);
+      const onlyByReview = r => excluded.has(r.uri) || !inPool.has(r.uri);
+      const reviewPicks = [...shuffle(themeReview.filter(onlyByReview)), ...shuffle(themeReview.filter(r => !onlyByReview(r)))]
         .slice(0, Math.ceil(perTheme / 2))
         .map(r => reviewToTrack(r, theme));
       const picked = new Set(reviewPicks.map(t => t.uri));

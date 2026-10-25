@@ -246,3 +246,41 @@ describe('buildTracks — exclusion et chansons à revoir', () => {
     expect(tracks.find(t => t.name === 'Seule').album.images).toEqual([]);
   });
 });
+
+describe('availableCount correspond à ce que buildTracks peut fournir', () => {
+  const reviewOf = (t, themeId) => ({ uri: t.uri, name: t.name, artists: ['R'], albumImage: null, themeId });
+
+  it.each([
+    ['tout exclu, 6 sons à revoir hors playlist', 10, 10, 6, 0],
+    ['8 exclus dont les 4 sons à revoir', 10, 8, 0, 4],
+    ['rien d\'exclu', 12, 0, 0, 0],
+    ['un peu de tout', 20, 15, 3, 2],
+    ['sons à revoir encore jouables dans la playlist', 6, 0, 1, 2],
+  ])('%s', async (_, poolSize, excludedCount, outsideReview, insideReview) => {
+    const { availableCount } = await import('./tracks.js');
+    const pool = Array.from({ length: poolSize }, (_, i) => track(`P${i}`));
+    mockPlaylists({ p1: pool });
+    const theme = makeTheme({ p1: 1 });
+    const excluded = new Set(pool.slice(0, excludedCount).map(t => t.uri));
+    const review = [
+      ...Array.from({ length: outsideReview }, (_, i) => reviewOf(track(`Hors ${i}`), theme.id)),
+      ...pool.slice(0, insideReview).map(t => reviewOf(t, theme.id)),
+    ];
+    const max = availableCount(theme.id, pool, excluded, review);
+    const built = await buildTracks([theme.id], max, () => {}, { excluded, review });
+    expect(built).toHaveLength(max);
+    const more = await buildTracks([theme.id], max + 1, () => {}, { excluded, review });
+    expect(more.length).toBeLessThan(max + 1);
+  });
+});
+
+describe('chansons enregistrées — bornes', () => {
+  it('tronque les titres et listes d\'artistes trop longs', async () => {
+    const { toTrackInput } = await import('./tracks.js');
+    const t = { uri: 'spotify:track:x', name: 'n'.repeat(400), artists: Array.from({ length: 30 }, () => ({ name: 'a'.repeat(300) })), album: { images: [] }, _themeId: '80s' };
+    const input = toTrackInput(t);
+    expect(input.name).toHaveLength(300);
+    expect(input.artists).toHaveLength(20);
+    expect(input.artists[0]).toHaveLength(200);
+  });
+});

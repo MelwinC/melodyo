@@ -14,6 +14,7 @@ let options = { timer: 'full', start: 'start' };
 let started = new Set();
 let playedMs = 0;
 let lastTick = null;
+let extractDone = false;
 
 // Temps d'écoute de l'extrait : ne s'écoule que pendant la lecture (la pause l'arrête, un saut de ±10 s ne change rien)
 function extractPatch(paused) {
@@ -22,7 +23,11 @@ function extractPatch(paused) {
   lastTick = paused ? null : now;
   if (options.timer !== '30s') return { remaining: null };
   const remaining = Math.max(0, EXTRACT_MS - playedMs);
-  if (remaining === 0 && !paused) player.pause().catch(() => {});
+  // Une seule pause automatique par chanson : après la révélation, on peut écouter la suite
+  if (remaining === 0 && !paused && !extractDone) {
+    extractDone = true;
+    player.pause().catch(() => {});
+  }
   return { remaining };
 }
 
@@ -156,6 +161,7 @@ function onPlayerStateChanged(state) {
     // Nouvelle chanson (ou retour sur une précédente) : l'extrait repart de zéro
     playedMs = 0;
     lastTick = null;
+    extractDone = false;
     if (options.start === 'middle') {
       player.seek(Math.max(0, Math.floor(state.duration / 2) - (options.timer === '30s' ? 15000 : 0)));
     }

@@ -34,6 +34,15 @@ describe('parties', () => {
     expect((await getGame(pool, host.id, first.id)).status).toBe('interrupted');
   });
 
+  it('termine la partie en cours si toutes ses chansons ont été jouées (onglet fermé)', async () => {
+    const host = await insertUser(pool);
+    const first = await newGame(host.id, 2);
+    await markPlayed(pool, host.id, first.id, 0);
+    await markPlayed(pool, host.id, first.id, 1);
+    await newGame(host.id);
+    expect((await getGame(pool, host.id, first.id)).status).toBe('finished');
+  });
+
   it('marque les chansons jouées', async () => {
     const host = await insertUser(pool);
     const { id } = await newGame(host.id);
@@ -84,5 +93,13 @@ describe('parties', () => {
     const last = await newGame(host.id);
     await markPlayed(pool, host.id, last.id, 2);
     expect(await lastGameExclusions(pool, host.id)).toEqual(['spotify:track:t2']);
+  });
+
+  it('ignore une partie qui n\'a joué aucune chanson (lancement échoué)', async () => {
+    const host = await insertUser(pool);
+    const played = await newGame(host.id);
+    await markPlayed(pool, host.id, played.id, 1);
+    await newGame(host.id);
+    expect(await lastGameExclusions(pool, host.id)).toEqual(['spotify:track:t1']);
   });
 });

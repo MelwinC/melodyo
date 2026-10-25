@@ -399,4 +399,17 @@ describe('options de lecture', () => {
     await Promise.resolve();
     expect(p.pause).toHaveBeenCalled();
   });
+
+  it('ne remet pas en pause après l\'extrait si l\'on relance la lecture', async () => {
+    const p = await queued({ timer: '30s' });
+    p.emit('player_state_changed', playingState('a'));
+    vi.advanceTimersByTime(30000);
+    p.emit('player_state_changed', playingState('a', { position: 30000 }));
+    expect(p.pause).toHaveBeenCalledOnce();
+    p.emit('player_state_changed', playingState('a', { paused: true, position: 30000 }));
+    p.emit('player_state_changed', playingState('a', { position: 30500 }));
+    vi.advanceTimersByTime(5000);
+    p.emit('player_state_changed', playingState('a', { position: 35500 }));
+    expect(p.pause).toHaveBeenCalledOnce();
+  });
 });

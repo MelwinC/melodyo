@@ -29,7 +29,10 @@ export async function createGame(pool, hostId, { settings, tracks }) {
   try {
     await client.query('BEGIN');
     await client.query(
-      "UPDATE games SET status = 'interrupted', ended_at = now() WHERE host_id = $1 AND status = 'playing'",
+      `UPDATE games g SET ended_at = now(), status = CASE
+         WHEN EXISTS (SELECT 1 FROM game_tracks t WHERE t.game_id = g.id AND NOT t.played) THEN 'interrupted'
+         ELSE 'finished' END
+       WHERE g.host_id = $1 AND g.status = 'playing'`,
       [hostId],
     );
     const { rows } = await client.query('INSERT INTO games (host_id, settings) VALUES ($1, $2) RETURNING id', [hostId, settings]);
@@ -92,11 +95,14 @@ export async function getGame(pool, hostId, gameId) {
   return { ...toSummary(rows[0]), tracks: tracks.rows.map(toTrack) };
 }
 
-// Chansons réellement jouées de la dernière partie démarrée, quel que soit son statut
+// Chansons réellement jouées de la dernière partie où au moins une chanson a été jouée
+// (une partie dont le lancement a échoué n'efface pas l'exclusion de la précédente)
 export async function lastGameExclusions(pool, hostId) {
   const { rows } = await pool.query(
     `SELECT uri FROM game_tracks WHERE played AND game_id = (
-       SELECT id FROM games WHERE host_id = $1 ORDER BY created_at DESC LIMIT 1
+       SELECT g.id FROM games g WHERE g.host_id = $1
+         AND EXISTS (SELECT 1 FROM game_tracks t WHERE t.game_id = g.id AND t.played)
+       ORDER BY g.created_at DESC LIMIT 1
      ) ORDER BY position`,
     [hostId],
   );
