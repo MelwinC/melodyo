@@ -1,0 +1,16 @@
+import { createApp } from '../server/app.js';
+import { loadConfig } from '../server/config.js';
+import { uniqueName } from './factories.js';
+
+// Limites larges par défaut : les tests créent beaucoup de comptes depuis la même IP
+const generous = { windowMs: 60_000, limit: 10_000 };
+export const TEST_LIMITS = { loginPerIp: generous, loginPerUser: generous, registerPerIp: generous };
+
+export function createTestApp(pool, { limits = TEST_LIMITS, ...configOverrides } = {}) {
+  return createApp({ config: { ...loadConfig({}, []), ...configOverrides }, pool, limits });
+}
+
+export async function signUp(agent, username = uniqueName(), password = 'motdepasse') {
+  const res = await agent.post('/api/auth/register').send({ username, password });
+  return res.body.user;
+}

@@ -36,3 +36,12 @@ describe('en-têtes de sécurité', () => {
     expect(csp).not.toHaveProperty('upgrade-insecure-requests');
   });
 });
+
+describe('erreurs de requête', () => {
+  it('répond en JSON à une URL mal encodée', async () => {
+    const env = { DATABASE_URL: 'postgres://x', TOKEN_ENCRYPTION_KEY: 'ab'.repeat(32) };
+    const res = await request(createApp({ config: loadConfig(env, ['--prod']), pool: null })).get('/spotify/%E0%A4%A').set('x-token', 't');
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'bad_request' });
+  });
+});
