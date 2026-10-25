@@ -184,11 +184,12 @@ describe('Create', () => {
     await userEvent.click(card('Années 80'));
     await userEvent.click(screen.getByRole('radio', { name: 'Extrait 30 s' }));
     await userEvent.click(screen.getByRole('radio', { name: 'Milieu' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'À la fin' }));
     expect(screen.getByRole('radio', { name: 'Milieu' })).toHaveAttribute('aria-checked', 'true');
     await userEvent.click(launch());
     expect(buildTracks).toHaveBeenCalledWith(['80s'], 5, expect.any(Function), { excluded: new Set(), review });
     expect(createGame).toHaveBeenCalledWith(
-      { themes: ['80s'], perTheme: 5, timer: '30s', start: 'middle' },
+      { themes: ['80s'], perTheme: 5, timer: '30s', start: 'middle', correction: 'end' },
       expect.arrayContaining([expect.objectContaining({ uri: 'spotify:track:u0', artists: ['A'], themeId: '80s' })]),
       undefined,
     );

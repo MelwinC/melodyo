@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { endGame, markPlayed } from './lib/games.js';
 import { ensurePlayer, pause, startQueue } from './lib/player.js';
-import { sendRoom } from './lib/room.js';
+import { getRoomState, sendRoom } from './lib/room.js';
 import { getSession, loadSession, subscribeSession } from './lib/session.js';
 import { toast } from './lib/toast.js';
 import Auth from './components/Auth.jsx';
+import Correction from './components/Correction.jsx';
 import Create from './components/Create.jsx';
 import Join from './components/Join.jsx';
 import GameDetail from './components/GameDetail.jsx';
@@ -13,6 +14,8 @@ import LinkSpotify from './components/LinkSpotify.jsx';
 import Player from './components/Player.jsx';
 import Profile from './components/Profile.jsx';
 import ReviewList from './components/ReviewList.jsx';
+import Scoreboard from './components/Scoreboard.jsx';
+import Screen from './components/Screen.jsx';
 import Toast from './components/Toast.jsx';
 import { useHostRoom } from './components/useHostRoom.js';
 
@@ -46,6 +49,10 @@ export default function App() {
     if (!gameId) return;
     sendRoom({ type: 'game:start', gameId });
     if (round) sendRoom({ type: 'round:start', ...round });
+    // Dernière phase connue avant la coupure (utile si le serveur a redémarré entre-temps)
+    const last = getRoomState().state;
+    if (last?.phase === 'correcting') sendRoom({ type: 'correction:start', position: last.correction.position });
+    if (last?.phase === 'final') sendRoom({ type: 'game:final' });
   });
 
   useEffect(() => {
@@ -98,6 +105,7 @@ export default function App() {
   }
 
   const toCreate = () => setScreen({ name: 'create' });
+  const roomState = host.live.state;
   const openJoin = () => {
     history.pushState({}, '', '/r/');
     setJoin('');
@@ -117,6 +125,21 @@ export default function App() {
     content = <LinkSpotify user={session.user} onJoin={openJoin} />;
   } else if (screen.name === 'profile') {
     content = <Profile user={session.user} onBack={toCreate} />;
+  } else if (screen.name === 'player' && roomState?.phase === 'correcting') {
+    const { position } = roomState.correction;
+    content = (
+      <Screen title="Correction" onBack={leaveGame}>
+        <Correction state={roomState} onReveal={p => sendRoom({ type: 'reveal', position: p })}
+          onCorrect={(participantId, field, ok) => sendRoom({ type: 'correct', position, participantId, field, ok })}
+          onNext={() => sendRoom({ type: 'correction:next' })} />
+      </Screen>
+    );
+  } else if (screen.name === 'player' && roomState?.phase === 'final') {
+    content = (
+      <Screen title="Fin de partie" onBack={leaveGame}>
+        <Scoreboard scores={roomState.scores} participants={roomState.participants} details={roomState.final.details} onClose={leaveGame} />
+      </Screen>
+    );
   } else if (screen.name === 'player') {
     content = <Player {...screen} room={host.live} onExit={leaveGame} onBack={leaveGame} />;
   } else if (screen.name === 'history') {

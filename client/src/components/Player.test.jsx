@@ -3,11 +3,13 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTrack, pollPosition, previousTrack, seek, seekBy, togglePlay } from '../lib/player.js';
 import { addToReview } from '../lib/games.js';
+import { sendRoom } from '../lib/room.js';
 import Player from './Player.jsx';
 
 const store = vi.hoisted(() => ({ snapshot: null, listeners: new Set() }));
 
 vi.mock('../lib/games.js', () => ({ addToReview: vi.fn(), removeFromReview: vi.fn() }));
+vi.mock('../lib/room.js', () => ({ sendRoom: vi.fn() }));
 vi.mock('../lib/toast.js', () => ({ toast: vi.fn() }));
 vi.mock('../lib/player.js', () => ({
   subscribePlayer: fn => { store.listeners.add(fn); return () => store.listeners.delete(fn); },
@@ -209,5 +211,51 @@ describe('Player', () => {
     expect(screen.queryByText(/ont répondu/)).toBeNull();
     ready({ room: { state: { round: { status: 'open', remainingMs: 1, paused: false }, participants: [], answered: [] }, receivedAt: 0 } });
     expect(screen.queryByText(/ont répondu/)).toBeNull();
+  });
+
+  describe('correction', () => {
+    const participants = [{ id: 'a', name: 'Les Rouges', avatar: { kind: 'preset', value: 'note' } }];
+    const roomOf = (over = {}) => ({
+      receivedAt: Date.now(),
+      state: {
+        participants, answered: [], phase: 'playing', revealed: [], answers: [{ participantId: 'a', title: 'T', artist: '', titleOk: null, artistOk: null }],
+        game: { id: 'g', total: 20, correction: 'live' },
+        round: { position: 2, status: 'closed', remainingMs: 0, paused: false },
+        correction: { position: 2 },
+        ...over,
+      },
+    });
+
+    it('à la volée : corrige la chanson fermée, révèle aux joueurs et propose le classement', async () => {
+      ready({ room: roomOf() });
+      await userEvent.click(screen.getByRole('button', { name: 'Titre correct' }));
+      expect(sendRoom).toHaveBeenCalledWith({ type: 'correct', position: 2, participantId: 'a', field: 'title', ok: true });
+      await userEvent.click(screen.getAllByRole('button', { name: '👁 Révéler' })[0]);
+      expect(sendRoom).toHaveBeenCalledWith({ type: 'reveal', position: 2 });
+      expect(cover()).not.toHaveClass('blur');
+      await userEvent.click(screen.getByRole('button', { name: '🏆 Classement' }));
+      expect(sendRoom).toHaveBeenLastCalledWith({ type: 'game:final' });
+    });
+
+    it('révèle localement sans prévenir le serveur quand la manche est encore ouverte', async () => {
+      ready({ room: roomOf({ correction: null, round: { position: 2, status: 'open', remainingMs: 1000, paused: false } }) });
+      await userEvent.click(reveal());
+      expect(sendRoom).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'reveal' }));
+    });
+
+    it('révèle depuis le panneau une chanson qui n\'est plus celle jouée', async () => {
+      store.snapshot = { ...store.snapshot, index: 3 };
+      ready({ room: roomOf() });
+      await userEvent.click(screen.getAllByRole('button', { name: '👁 Révéler' }).at(-1));
+      expect(sendRoom).toHaveBeenCalledWith({ type: 'reveal', position: 2 });
+      expect(cover()).toHaveClass('blur');
+    });
+
+    it('à la fin : propose de lancer la correction', async () => {
+      ready({ room: roomOf({ game: { id: 'g', total: 20, correction: 'end' }, correction: null }) });
+      expect(screen.queryByRole('button', { name: 'Titre correct' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: '✅ Corriger les réponses' }));
+      expect(sendRoom).toHaveBeenCalledWith({ type: 'correction:start' });
+    });
   });
 });

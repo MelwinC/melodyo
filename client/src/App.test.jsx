@@ -18,7 +18,17 @@ vi.mock('./lib/session.js', () => ({
 vi.mock('./lib/player.js', () => ({ ensurePlayer: vi.fn(), pause: vi.fn(), startQueue: vi.fn() }));
 vi.mock('./lib/games.js', () => ({ markPlayed: vi.fn(), endGame: vi.fn() }));
 const host = vi.hoisted(() => ({ value: null }));
-vi.mock('./lib/room.js', () => ({ sendRoom: vi.fn() }));
+const roomStore = vi.hoisted(() => ({ state: null }));
+vi.mock('./lib/room.js', () => ({ sendRoom: vi.fn(), getRoomState: () => ({ state: roomStore.state }) }));
+vi.mock('./components/Correction.jsx', () => ({ default: ({ state, onCorrect, onReveal, onNext }) => (
+  <div>
+    <p>correction {state.correction.position}</p>
+    <button onClick={() => onCorrect('p1', 'title', true)}>valider</button>
+    <button onClick={() => onReveal(1)}>révéler</button>
+    <button onClick={onNext}>suivante</button>
+  </div>
+) }));
+vi.mock('./components/Scoreboard.jsx', () => ({ default: ({ scores, details, onClose }) => <button onClick={onClose}>classement {scores.length} {Object.keys(details).length}</button> }));
 vi.mock('./components/useHostRoom.js', () => ({ useHostRoom: (user, enabled, onReconnect) => { host.onReconnect = onReconnect; host.enabled = enabled; return host.value; } }));
 vi.mock('./components/Join.jsx', () => ({ default: ({ code, user, onLeave }) => <button onClick={onLeave}>rejoindre [{code}] {user?.username ?? 'invité'}</button> }));
 vi.mock('./components/History.jsx', () => ({ default: ({ onOpen, onBack }) => <div><button onClick={() => onOpen('g9')}>ouvrir g9</button><button onClick={onBack}>retour historique</button></div> }));
@@ -250,5 +260,48 @@ describe('App', () => {
     sendRoom.mockClear();
     rerender(<App />);
     expect(sendRoom).not.toHaveBeenCalledWith({ type: 'game:end' });
+  });
+
+  describe('correction et classement', () => {
+    async function playing(state) {
+      store.snapshot = { status: 'ready', user };
+      ensurePlayer.mockResolvedValue();
+      startQueue.mockResolvedValue();
+      const view = render(<App />);
+      await userEvent.click(screen.getByText('écran création Mel'));
+      host.value = { ...host.value, live: { connected: true, state: { participants: [], game: { id: 'g1' }, ...state } } };
+      view.rerender(<App />);
+      return view;
+    }
+
+    it('affiche l\'écran de correction à la fin et pilote la correction', async () => {
+      await playing({ phase: 'correcting', correction: { position: 1 } });
+      sendRoom.mockClear();
+      await userEvent.click(screen.getByText('valider'));
+      expect(sendRoom).toHaveBeenCalledWith({ type: 'correct', position: 1, participantId: 'p1', field: 'title', ok: true });
+      await userEvent.click(screen.getByText('révéler'));
+      expect(sendRoom).toHaveBeenCalledWith({ type: 'reveal', position: 1 });
+      await userEvent.click(screen.getByText('suivante'));
+      expect(sendRoom).toHaveBeenLastCalledWith({ type: 'correction:next' });
+    });
+
+    it('affiche le classement final puis termine la partie', async () => {
+      await playing({ phase: 'final', scores: [{ id: 'p1' }], final: { details: { p1: [] } } });
+      await userEvent.click(screen.getByText('classement 1 1'));
+      expect(endGame).toHaveBeenCalledWith('g1');
+      expect(screen.getByText('écran création Mel')).toBeInTheDocument();
+    });
+
+    it('renvoie la phase de correction après une coupure', async () => {
+      await playing({ phase: 'playing' });
+      sendRoom.mockClear();
+      roomStore.state = { phase: 'correcting', correction: { position: 4 } };
+      host.onReconnect();
+      expect(sendRoom).toHaveBeenLastCalledWith({ type: 'correction:start', position: 4 });
+      roomStore.state = { phase: 'final' };
+      host.onReconnect();
+      expect(sendRoom).toHaveBeenLastCalledWith({ type: 'game:final' });
+      roomStore.state = null;
+    });
   });
 });

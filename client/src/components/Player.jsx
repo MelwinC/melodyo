@@ -1,6 +1,8 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { findTheme } from '../lib/themes.js';
+import { sendRoom } from '../lib/room.js';
 import { toTrackInput } from '../lib/tracks.js';
+import Correction from './Correction.jsx';
 import { useReview } from './useReview.js';
 import { fmtClock, useCountdown } from './useCountdown.js';
 import {
@@ -20,6 +22,8 @@ export default function Player({ title, status, loadingText, error, onExit, onBa
   const snap = useSyncExternalStore(subscribePlayer, getPlayerSnapshot);
   const review = useReview(reviewUris ?? new Set());
   const round = room?.state?.round;
+  const roomGame = room?.state?.game;
+  const correction = room?.state?.correction;
   const participants = room?.state?.participants ?? [];
   const answerMs = useCountdown(round, room?.receivedAt);
   const [revealed, setRevealed] = useState(false);
@@ -51,6 +55,12 @@ export default function Player({ title, status, loadingText, error, onExit, onBa
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     seek(pct * snap.duration);
+  }
+
+  // Révéler une chanson en cours de correction la montre aussi à tous les participants
+  function revealPosition(position) {
+    if (position === snap.index) setRevealed(true);
+    if (correction?.position === position) sendRoom({ type: 'reveal', position });
   }
 
   const track = snap.sdkTrack;
@@ -128,7 +138,16 @@ export default function Player({ title, status, loadingText, error, onExit, onBa
               : <button className="btn-hint" onClick={() => setHintShown(true)}>💡 Indice : thème</button>}
           </div>
 
-          {!revealed && <button className="btn-reveal" onClick={() => setRevealed(true)}>👁 Révéler</button>}
+          {!revealed && <button className="btn-reveal" onClick={() => revealPosition(snap.index)}>👁 Révéler</button>}
+          {roomGame?.correction === 'live' && correction && (
+            <Correction state={room.state} onReveal={revealPosition}
+              onCorrect={(participantId, field, ok) => sendRoom({ type: 'correct', position: correction.position, participantId, field, ok })} />
+          )}
+          {roomGame && room.state.phase === 'playing' && (
+            roomGame.correction === 'end'
+              ? <button className="btn btn-ghost" onClick={() => sendRoom({ type: 'correction:start' })}>✅ Corriger les réponses</button>
+              : <button className="btn btn-ghost" onClick={() => sendRoom({ type: 'game:final' })}>🏆 Classement</button>
+          )}
           {revealed && current && (
             <button className="btn-hint btn-review" aria-pressed={inReview} onClick={() => review.toggle(current)}>
               {inReview ? '✓ À revoir' : '⭐ À revoir'}

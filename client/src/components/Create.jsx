@@ -37,6 +37,7 @@ export default function Create({ user, onStart, onProfile, onHistory, onReview, 
   const [perTheme, setPerTheme] = useState(5);
   const [timer, setTimer] = useState('full');
   const [start, setStart] = useState('start');
+  const [correction, setCorrection] = useState('live');
   const [progress, setProgress] = useState(null);
 
   // Lancer la connexion SDK dès l'affichage de l'écran pour éviter le délai au lancement
@@ -87,7 +88,7 @@ export default function Create({ user, onStart, onProfile, onHistory, onReview, 
       const tracks = await buildTracks(selected, value, (label, pct) => setProgress({ label, pct }), context);
       if (!tracks.length) throw new Error('Aucun son trouvé pour ces thèmes.');
       setProgress({ label: 'Lancement…', pct: 95 });
-      const gameId = await createGame({ themes: selected, perTheme: value, timer, start }, tracks.map(toTrackInput), room?.id);
+      const gameId = await createGame({ themes: selected, perTheme: value, timer, start, correction }, tracks.map(toTrackInput), room?.id);
       onStart(tracks, selected.map(id => findTheme(id).emoji).join(' '), {
         gameId, timer, start, reviewUris: new Set(context.review.map(r => r.uri)),
       });
@@ -155,6 +156,8 @@ export default function Create({ user, onStart, onProfile, onHistory, onReview, 
           options={[['full', 'Chanson entière'], ['30s', 'Extrait 30 s']]} />
         <Choice label="Départ" value={start} onChange={setStart}
           options={[['start', 'Début'], ['middle', 'Milieu']]} />
+        <Choice label="Correction" value={correction} onChange={setCorrection}
+          options={[['live', 'Après chaque chanson'], ['end', 'À la fin']]} />
         <button className="btn btn-green btn-full" disabled={!selected.length || pending || !!progress} onClick={doCreate}>
           ▶ Lancer la partie
         </button>

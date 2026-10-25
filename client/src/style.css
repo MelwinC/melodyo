@@ -576,3 +576,34 @@ input[type="range"] {
 .answer-locked { color: var(--danger); font-weight: 600; font-size: 14px; }
 .answer-saved { color: var(--green); font-size: 13px; }
 .join-code { text-align: center; }
+
+/* ── CORRECTION ET CLASSEMENT ── */
+.correction { background: var(--surface); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 14px; width: 100%; }
+.correction-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-weight: 700; }
+.correction-track { display: flex; align-items: center; gap: 8px; color: var(--green); }
+.correction-cover { width: 40px; height: 40px; border-radius: 6px; }
+.correction-hidden { color: var(--text2); font-weight: 500; }
+.correction-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.correction-list li { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; align-items: center; }
+.correction-name { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+.verdict { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.verdict-answer { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.verdict button { width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--surface2); color: var(--text2); cursor: pointer; font-weight: 800; }
+.verdict button:disabled { opacity: .3; cursor: not-allowed; }
+.verdict-ok[aria-pressed="true"] { background: var(--green); color: #000; }
+.verdict-ko[aria-pressed="true"] { background: var(--danger); color: #fff; }
+.scoreboard { display: flex; flex-direction: column; gap: 14px; width: 100%; }
+.score-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.score-row {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: none; cursor: pointer;
+  background: var(--surface); border-radius: var(--radius); color: var(--text); font-size: 15px; text-align: left;
+}
+.score-rank { font-weight: 800; width: 24px; color: var(--green); }
+.score-name { flex: 1; font-weight: 600; }
+.score-points { font-weight: 800; }
+.score-detail { list-style: none; padding: 8px 14px; display: flex; flex-direction: column; gap: 8px; }
+.score-track { font-size: 13px; font-weight: 600; }
+.score-answer { display: flex; gap: 16px; font-size: 13px; }
+.score-answer .ok, .score-answer.ok { color: var(--green); }
+.score-answer .ko, .score-answer.ko { color: var(--text2); }
+@media (max-width: 480px) { .correction-list li { grid-template-columns: 1fr; } }
