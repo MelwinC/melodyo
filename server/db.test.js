@@ -23,9 +23,10 @@ describe('base de données', () => {
 describe('pool face à une coupure de la base', () => {
   it('survit à la fermeture de ses connexions par PostgreSQL', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const victim = createPool(testDatabaseUrl());
+    const victim = createPool(`${testDatabaseUrl()}?application_name=victim`);
     await victim.query('SELECT 1');
-    await pool.query("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()");
+    // Seules les connexions de ce pool : les autres fichiers de test partagent la même base en parallèle
+    await pool.query("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = 'victim'");
     await vi.waitFor(() => expect(error).toHaveBeenCalledWith('[db]', expect.any(String)));
     const { rows } = await victim.query('SELECT 1 AS ok');
     expect(rows).toEqual([{ ok: 1 }]);
