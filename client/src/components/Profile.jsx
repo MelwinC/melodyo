@@ -2,6 +2,7 @@ import { AVATAR_PRESETS } from '../../../shared/avatars.js';
 import { choosePreset, messageFor, uploadAvatar } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 import Avatar from './Avatar.jsx';
+import Stats from './Stats.jsx';
 
 async function attempt(action) {
   try {
@@ -29,6 +30,7 @@ export default function Profile({ user, onBack }) {
       <div className="profile">
         <Avatar avatar={user.avatar} size={96} />
         <div className="profile-name">{user.username}</div>
+        <Stats />
         <div className="form-group">
           <label>Choisir un avatar</label>
           <div className="avatar-grid">
