@@ -12,6 +12,11 @@ const hostSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('round:start'), position: z.number().int().min(0), durationMs: z.number().int().min(1).max(3_600_000) }),
   z.object({ type: z.literal('playback'), paused: z.boolean() }),
   z.object({ type: z.literal('game:end') }),
+  z.object({ type: z.literal('correct'), position: z.number().int().min(0), participantId: z.uuid(), field: z.enum(['title', 'artist']), ok: z.boolean() }),
+  z.object({ type: z.literal('reveal'), position: z.number().int().min(0) }),
+  z.object({ type: z.literal('correction:start'), position: z.number().int().min(0).optional() }),
+  z.object({ type: z.literal('correction:next') }),
+  z.object({ type: z.literal('game:final') }),
 ]);
 const answerSchema = z.object({
   type: z.literal('answer'),

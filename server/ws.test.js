@@ -168,6 +168,8 @@ describe('partie en direct', () => {
 
     h.send({ type: 'playback', paused: true });
     await h.next(m => state(m) && m.round?.paused);
+    h.send({ type: 'game:final' });
+    expect((await g.next(m => state(m) && m.phase === 'final')).revealed).toHaveLength(2);
     h.send({ type: 'game:end' });
     await g.next(m => state(m) && m.game === null);
     for (const c of [h, g, p]) c.ws.close();
@@ -183,8 +185,10 @@ describe('partie en direct', () => {
     phone.send({ type: 'hello', code: room.code, role: 'player' });
     expect(await pc.next(state)).toHaveProperty('answered');
     expect(await phone.next(state)).toHaveProperty('you');
-    phone.send({ type: 'game:end' });
-    expect(await phone.next(m => m.type === 'error')).toEqual({ type: 'error', error: 'invalid_message' });
+    for (const type of ['game:end', 'reveal', 'game:final']) {
+      phone.send({ type, position: 0 });
+      expect(await phone.next(m => m.type === 'error')).toEqual({ type: 'error', error: 'invalid_message' });
+    }
     pc.ws.close();
     phone.ws.close();
   });

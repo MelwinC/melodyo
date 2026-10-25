@@ -68,7 +68,12 @@ describe('connexion', () => {
       ],
       game: null,
       round: null,
-      you: { id: a.id, answer: null },
+      phase: null,
+      correction: null,
+      revealed: [],
+      scores: [],
+      final: null,
+      you: { id: a.id, answer: null, results: [] },
     });
     expect(h.last()).toMatchObject({ type: 'state', game: null, round: null, answered: [] });
     expect(h.last()).not.toHaveProperty('you');
@@ -79,7 +84,7 @@ describe('manches', () => {
   it('ouvre une manche de 90 s en mode 30 s', async () => {
     const { room, gameId, pa, h } = await setup({ timer: '30s' });
     await hub.hostEvent(room.id, { type: 'game:start', gameId });
-    expect(pa.last().game).toEqual({ id: gameId, total: 3, timer: '30s' });
+    expect(pa.last().game).toEqual({ id: gameId, total: 3, timer: '30s', correction: 'live' });
     await hub.hostEvent(room.id, { type: 'round:start', position: 0, durationMs: 200000 });
     expect(pa.last().round).toEqual({ position: 0, status: 'open', remainingMs: 90000, paused: false });
     expect(h.last().round.status).toBe('open');
@@ -180,7 +185,7 @@ describe('réponses', () => {
     const { room, a, pa, h } = await playing();
     expect(await hub.answer(room.id, a.id, { position: 0, title: 'Take On Me', artist: '' })).toBe('saved');
     expect(h.last().answered).toEqual([a.id]);
-    expect(pa.last().you).toEqual({ id: a.id, answer: { title: 'Take On Me', artist: '' } });
+    expect(pa.last().you).toEqual({ id: a.id, answer: { title: 'Take On Me', artist: '' }, results: [] });
     expect(JSON.stringify(h.last())).not.toContain('Take On Me');
   });
 

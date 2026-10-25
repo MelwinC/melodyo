@@ -103,7 +103,8 @@ export async function isOpenRoomOf(pool, roomId, hostId) {
 // Partie de la room, sans aucune information sur les chansons (diffusée aux participants)
 export async function getRoomGame(pool, roomId, gameId) {
   const { rows } = await pool.query(
-    `SELECT g.id, g.settings->>'timer' AS timer, (SELECT count(*)::int FROM game_tracks t WHERE t.game_id = g.id) AS total
+    `SELECT g.id, g.settings->>'timer' AS timer, COALESCE(g.settings->>'correction', 'live') AS correction,
+            (SELECT count(*)::int FROM game_tracks t WHERE t.game_id = g.id) AS total
      FROM games g WHERE g.id = $1 AND g.room_id = $2`,
     [gameId, roomId],
   );
