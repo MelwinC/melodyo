@@ -99,3 +99,13 @@ export async function isOpenRoomOf(pool, roomId, hostId) {
   const { rowCount } = await pool.query('SELECT 1 FROM rooms WHERE id = $1 AND host_id = $2 AND closed_at IS NULL', [roomId, hostId]);
   return rowCount > 0;
 }
+
+// Partie de la room, sans aucune information sur les chansons (diffusée aux participants)
+export async function getRoomGame(pool, roomId, gameId) {
+  const { rows } = await pool.query(
+    `SELECT g.id, g.settings->>'timer' AS timer, (SELECT count(*)::int FROM game_tracks t WHERE t.game_id = g.id) AS total
+     FROM games g WHERE g.id = $1 AND g.room_id = $2`,
+    [gameId, roomId],
+  );
+  return rows[0] ?? null;
+}
