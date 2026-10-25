@@ -4,7 +4,7 @@ import { createApp } from './app.js';
 import { loadConfig } from './config.js';
 
 const headersFor = async argv => {
-  const env = { DATABASE_URL: 'postgres://x' };
+  const env = { DATABASE_URL: 'postgres://x', TOKEN_ENCRYPTION_KEY: 'ab'.repeat(32) };
   const res = await request(createApp({ config: loadConfig(env, argv), pool: null })).get('/login');
   return res.headers;
 };

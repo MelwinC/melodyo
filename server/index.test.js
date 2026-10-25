@@ -25,7 +25,7 @@ describe('start', () => {
 
   it('annonce le mode production', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const { close } = await start({ env: { PORT: '0', DATABASE_URL: testDatabaseUrl() }, argv: ['--prod'] });
+    const { close } = await start({ env: { PORT: '0', DATABASE_URL: testDatabaseUrl(), TOKEN_ENCRYPTION_KEY: 'ab'.repeat(32) }, argv: ['--prod'] });
     await close();
     expect(log.mock.calls[0][0]).toMatch(/Melodyo — http/);
     expect(log.mock.calls[0][0]).not.toMatch(/dev/);
