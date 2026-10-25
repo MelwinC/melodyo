@@ -214,4 +214,14 @@ describe('Create', () => {
     await userEvent.click(card('Années 80'));
     expect(card('Années 80')).toHaveTextContent('12 sons');
   });
+
+  it('ouvre l\'historique et la liste à revoir', async () => {
+    const onHistory = vi.fn();
+    const onReview = vi.fn();
+    render(<Create user={user} onProfile={vi.fn()} onStart={vi.fn()} onHistory={onHistory} onReview={onReview} />);
+    await userEvent.click(screen.getByRole('button', { name: '📜 Historique' }));
+    await userEvent.click(screen.getByRole('button', { name: '⭐ À revoir' }));
+    expect(onHistory).toHaveBeenCalled();
+    expect(onReview).toHaveBeenCalled();
+  });
 });

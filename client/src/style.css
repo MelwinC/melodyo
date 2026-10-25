@@ -527,3 +527,23 @@ input[type="range"] {
   background: transparent; color: var(--text2); font-weight: 600; font-size: 13px;
 }
 .segmented button[aria-checked="true"] { background: var(--green); color: #000; }
+
+/* ── HISTORIQUE ET À REVOIR ── */
+.game-item { border: none; color: var(--text); text-align: left; width: 100%; cursor: pointer; }
+.game-item:hover { background: var(--surface2); }
+.status-finished { color: var(--green); }
+.status-playing { color: #fdcb6e; }
+.game-settings { color: var(--text2); font-size: 13px; margin-bottom: 16px; }
+.track-row {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface); border-radius: var(--radius); padding: 10px 12px;
+}
+.track-row.unplayed { opacity: .5; }
+.track-row-cover { width: 44px; height: 44px; border-radius: 6px; background: var(--surface2); flex-shrink: 0; object-fit: cover; }
+.track-row-info { flex: 1; min-width: 0; }
+.track-row-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-row-artists { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.track-row .btn[aria-pressed="true"] { background: rgba(29,185,84,.2); color: var(--green); }
+.home-links { display: flex; gap: 8px; margin-bottom: 20px; }
+.home-links .btn { flex: 1; }
+.btn-review[aria-pressed="true"] { border-color: var(--green); color: var(--green); }

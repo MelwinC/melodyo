@@ -2,10 +2,13 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTrack, pollPosition, previousTrack, seek, seekBy, togglePlay } from '../lib/player.js';
+import { addToReview } from '../lib/games.js';
 import Player from './Player.jsx';
 
 const store = vi.hoisted(() => ({ snapshot: null, listeners: new Set() }));
 
+vi.mock('../lib/games.js', () => ({ addToReview: vi.fn(), removeFromReview: vi.fn() }));
+vi.mock('../lib/toast.js', () => ({ toast: vi.fn() }));
 vi.mock('../lib/player.js', () => ({
   subscribePlayer: fn => { store.listeners.add(fn); return () => store.listeners.delete(fn); },
   getPlayerSnapshot: () => store.snapshot,
@@ -177,5 +180,17 @@ describe('Player', () => {
     setSnapshot({ sdkTrack: sdkTrack('b'), index: 3 });
     expect(cover()).not.toBe(before);
     expect(cover()).toHaveClass('blur');
+  });
+
+  it('ajoute la chanson révélée à la liste à revoir', async () => {
+    const tracks = [0, 1, 2].map(i => ({ ...sdkTrack(`q${i}`), _themeId: '80s' }));
+    ready({ tracks, reviewUris: new Set(['spotify:track:dejà']) });
+    expect(screen.queryByRole('button', { name: /À revoir/ })).toBeNull();
+    await userEvent.click(reveal());
+    const button = screen.getByRole('button', { name: '⭐ À revoir' });
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(button);
+    expect(addToReview).toHaveBeenCalledWith({ uri: 'q2', name: 'Titre q2', artists: ['A1', 'A2'], albumImage: 'https://i.scdn.co/q2', themeId: '80s' });
+    expect(screen.getByRole('button', { name: '✓ À revoir' })).toHaveAttribute('aria-pressed', 'true');
   });
 });

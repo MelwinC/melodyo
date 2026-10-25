@@ -1,5 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { findTheme } from '../lib/themes.js';
+import { toTrackInput } from '../lib/tracks.js';
+import { useReview } from './useReview.js';
 import {
   getPlayerSnapshot, subscribePlayer, pollPosition,
   togglePlay, nextTrack, previousTrack, seek, seekBy,
@@ -13,8 +15,9 @@ function fmtTime(ms) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-export default function Player({ title, status, loadingText, error, onExit, onBack }) {
+export default function Player({ title, status, loadingText, error, onExit, onBack, tracks, reviewUris }) {
   const snap = useSyncExternalStore(subscribePlayer, getPlayerSnapshot);
+  const review = useReview(reviewUris ?? new Set());
   const [revealed, setRevealed] = useState(false);
   const [hintShown, setHintShown] = useState(false);
 
@@ -49,6 +52,8 @@ export default function Player({ title, status, loadingText, error, onExit, onBa
   const track = snap.sdkTrack;
   const cover = track?.album?.images?.[0]?.url;
   const theme = snap.theme && findTheme(snap.theme.id);
+  const current = tracks?.[snap.index] && toTrackInput(tracks[snap.index]);
+  const inReview = current && review.has(current.uri);
 
   return (
     <div className="screen player-screen">
@@ -114,6 +119,11 @@ export default function Player({ title, status, loadingText, error, onExit, onBa
           </div>
 
           {!revealed && <button className="btn-reveal" onClick={() => setRevealed(true)}>👁 Révéler</button>}
+          {revealed && current && (
+            <button className="btn-hint btn-review" aria-pressed={inReview} onClick={() => review.toggle(current)}>
+              {inReview ? '✓ À revoir' : '⭐ À revoir'}
+            </button>
+          )}
         </div>
       )}
     </div>

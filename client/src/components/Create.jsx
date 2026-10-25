@@ -29,7 +29,7 @@ function Choice({ label, value, options, onChange }) {
   );
 }
 
-export default function Create({ user, onStart, onProfile }) {
+export default function Create({ user, onStart, onProfile, onHistory, onReview }) {
   const [selected, setSelected] = useState([]);
   const [pools, setPools] = useState(getThemePools);
   const [context, setContext] = useState(null);
@@ -106,6 +106,10 @@ export default function Create({ user, onStart, onProfile }) {
         <h1>🎵 Melodyo</h1>
         <button className="btn btn-ghost btn-sm" onClick={() => { disconnect(); logout(); }}>Déco.</button>
       </header>
+      <div className="home-links">
+        <button className="btn btn-ghost btn-sm" onClick={onHistory}>📜 Historique</button>
+        <button className="btn btn-ghost btn-sm" onClick={onReview}>⭐ À revoir</button>
+      </div>
       {isFirefox && (
         <div className="browser-warning">
           ⚠️ Firefox ne peut pas lire l'audio Spotify (DRM refusé par Spotify). Utilise Chrome, Edge ou Safari.

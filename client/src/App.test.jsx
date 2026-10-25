@@ -2,6 +2,7 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ensurePlayer, pause, startQueue } from './lib/player.js';
+import { endGame, markPlayed } from './lib/games.js';
 import { loadSession } from './lib/session.js';
 import { toast } from './lib/toast.js';
 import App from './App.jsx';
@@ -14,22 +15,28 @@ vi.mock('./lib/session.js', () => ({
   loadSession: vi.fn(),
 }));
 vi.mock('./lib/player.js', () => ({ ensurePlayer: vi.fn(), pause: vi.fn(), startQueue: vi.fn() }));
+vi.mock('./lib/games.js', () => ({ markPlayed: vi.fn(), endGame: vi.fn() }));
+vi.mock('./components/History.jsx', () => ({ default: ({ onOpen, onBack }) => <div><button onClick={() => onOpen('g9')}>ouvrir g9</button><button onClick={onBack}>retour historique</button></div> }));
+vi.mock('./components/GameDetail.jsx', () => ({ default: ({ gameId, onBack }) => <button onClick={onBack}>détail {gameId}</button> }));
+vi.mock('./components/ReviewList.jsx', () => ({ default: ({ onBack }) => <button onClick={onBack}>liste à revoir</button> }));
 vi.mock('./lib/toast.js', async importOriginal => ({ ...(await importOriginal()), toast: vi.fn() }));
 vi.mock('./components/Auth.jsx', () => ({ default: () => <p>écran connexion</p> }));
 vi.mock('./components/LinkSpotify.jsx', () => ({ default: ({ user }) => <p>relier spotify {user.username}</p> }));
 vi.mock('./components/Profile.jsx', () => ({ default: ({ onBack }) => <button onClick={onBack}>écran profil</button> }));
 vi.mock('./components/Create.jsx', () => ({
-  default: ({ user, onStart, onProfile }) => (
+  default: ({ user, onStart, onProfile, onHistory, onReview }) => (
     <div>
-      <button onClick={() => onStart([{ uri: 'a' }], '📻')}>écran création {user.username}</button>
+      <button onClick={() => onStart([{ uri: 'a' }], '📻', { gameId: 'g1', timer: '30s', start: 'middle', reviewUris: new Set(['u']) })}>écran création {user.username}</button>
       <button onClick={onProfile}>profil</button>
+      <button onClick={onHistory}>historique</button>
+      <button onClick={onReview}>à revoir</button>
     </div>
   ),
 }));
 vi.mock('./components/Player.jsx', () => ({
-  default: ({ status, loadingText, error, onExit, onBack }) => (
+  default: ({ status, loadingText, error, onExit, onBack, tracks, reviewUris }) => (
     <div>
-      <p>écran lecture {status} {loadingText} {error}</p>
+      <p>écran lecture {status} {loadingText} {error} {tracks?.length} {reviewUris?.size}</p>
       <button onClick={onExit}>quitter</button>
       <button onClick={onBack}>retour</button>
     </div>
@@ -99,10 +106,15 @@ describe('App', () => {
     await userEvent.click(screen.getByText('écran création Mel'));
     expect(screen.getByText(/écran lecture loading Connexion au lecteur Spotify…/)).toBeInTheDocument();
     await act(async () => connected());
-    expect(startQueue).toHaveBeenCalledWith([{ uri: 'a' }]);
-    expect(screen.getByText(/écran lecture ready/)).toBeInTheDocument();
+    expect(startQueue).toHaveBeenCalledWith([{ uri: 'a' }], { timer: '30s', start: 'middle', onTrackStart: expect.any(Function) });
+    expect(screen.getByText('écran lecture ready 1 1')).toBeInTheDocument();
+    markPlayed.mockRejectedValue(new Error('down'));
+    startQueue.mock.calls[0][1].onTrackStart(2);
+    expect(markPlayed).toHaveBeenCalledWith('g1', 2);
+    endGame.mockResolvedValue({ status: 'finished' });
     await userEvent.click(screen.getByText('quitter'));
     expect(pause).toHaveBeenCalled();
+    expect(endGame).toHaveBeenCalledWith('g1');
     expect(screen.getByText('écran création Mel')).toBeInTheDocument();
   });
 
@@ -112,7 +124,21 @@ describe('App', () => {
     render(<App />);
     await userEvent.click(screen.getByText('écran création Mel'));
     expect(await screen.findByText(/écran lecture error\s+Spotify Premium requis/)).toBeInTheDocument();
+    endGame.mockRejectedValue(new Error('down'));
     await userEvent.click(screen.getByText('retour'));
+    expect(endGame).toHaveBeenCalledWith('g1');
+    expect(screen.getByText('écran création Mel')).toBeInTheDocument();
+  });
+
+  it('navigue dans l\'historique et la liste à revoir', async () => {
+    store.snapshot = { status: 'ready', user };
+    render(<App />);
+    await userEvent.click(screen.getByText('historique'));
+    await userEvent.click(screen.getByText('ouvrir g9'));
+    await userEvent.click(screen.getByText('détail g9'));
+    await userEvent.click(screen.getByText('retour historique'));
+    await userEvent.click(screen.getByText('à revoir'));
+    await userEvent.click(screen.getByText('liste à revoir'));
     expect(screen.getByText('écran création Mel')).toBeInTheDocument();
   });
 });
