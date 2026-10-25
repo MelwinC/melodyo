@@ -1,13 +1,23 @@
-// Statistiques d'un compte, calculées à partir des parties terminées où il a répondu.
-// Si le compte apparaît deux fois dans une partie (invité puis compte), sa meilleure participation compte.
+// Statistiques d'un compte, à partir des parties qui ont atteint le classement final (toutes les chansons
+// révélées) : une partie abandonnée en pleine correction ne donne ni victoire ni défaite.
+// Joueurs d'une partie : ceux qui y ont donné au moins une réponse non vide (même règle que le classement).
+// DISTINCT ON garde une seule participation par partie (défensif : une partie appartient à une seule room).
 const GAMES_QUERY = `
-  WITH scores AS (
+  WITH my_games AS (
+    SELECT DISTINCT a.game_id FROM answers a JOIN participants p ON p.id = a.participant_id WHERE p.user_id = $1
+  ),
+  scores AS (
     SELECT a.game_id, a.participant_id,
            sum((a.title_ok IS TRUE)::int + (a.artist_ok IS TRUE)::int)::int AS score,
            sum((a.title_ok IS TRUE)::int)::int AS titles,
            sum((a.artist_ok IS TRUE)::int)::int AS artists
-    FROM answers a JOIN games g ON g.id = a.game_id AND g.status = 'finished'
+    FROM answers a
+    JOIN my_games m ON m.game_id = a.game_id
+    JOIN games g ON g.id = a.game_id AND g.status = 'finished'
+    WHERE (SELECT count(*) FROM game_reveals r WHERE r.game_id = g.id)
+        = (SELECT count(*) FROM game_tracks t WHERE t.game_id = g.id)
     GROUP BY a.game_id, a.participant_id
+    HAVING bool_or(a.title <> '' OR a.artist <> '')
   ),
   ranked AS (
     SELECT s.*, RANK() OVER (PARTITION BY s.game_id ORDER BY s.score DESC)::int AS rank,
@@ -17,7 +27,7 @@ const GAMES_QUERY = `
   SELECT DISTINCT ON (r.game_id) r.game_id, r.participant_id, r.titles, r.artists, r.rank, r.players,
          (SELECT count(*)::int FROM game_tracks t WHERE t.game_id = r.game_id) AS songs
   FROM ranked r JOIN participants p ON p.id = r.participant_id AND p.user_id = $1
-  ORDER BY r.game_id, r.score DESC`;
+  ORDER BY r.game_id, r.score DESC, r.participant_id`;
 
 const THEMES_QUERY = `
   SELECT t.theme_id, count(*)::int AS songs,

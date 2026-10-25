@@ -163,3 +163,12 @@ export async function getTrack(pool, gameId, position) {
   );
   return rows[0] ? { position: rows[0].position, name: rows[0].name, artists: rows[0].artists, albumImage: rows[0].album_image } : null;
 }
+
+// Joueurs d'une partie : ceux qui y ont donné au moins une réponse non vide (même règle que les stats)
+export async function getGamePlayers(pool, gameId) {
+  const { rows } = await pool.query(
+    "SELECT DISTINCT participant_id FROM answers WHERE game_id = $1 AND (title <> '' OR artist <> '')",
+    [gameId],
+  );
+  return new Set(rows.map(r => r.participant_id));
+}

@@ -80,6 +80,7 @@ describe('correction à la volée', () => {
     const ctx = await setup();
     await play(ctx, 0);
     await ctx.answer(0, 0, 'Take On Me', 'a-ha');
+    await ctx.answer(1, 0, 'Faux', '');
     await close();
     await ctx.ev({ type: 'correct', position: 0, participantId: ctx.ps[0].id, field: 'title', ok: true });
     await ctx.ev({ type: 'correct', position: 0, participantId: ctx.ps[0].id, field: 'artist', ok: false });
@@ -124,7 +125,7 @@ describe('correction à la volée', () => {
     expect(state.revealed.map(r => r.position)).toEqual([0, 1]);
     expect(state.scores[0]).toMatchObject({ id: ctx.ps[1].id, score: 1, rank: 1 });
     expect(state.final.details[ctx.ps[1].id][0]).toMatchObject({ answer: { title: 'Bon', artist: '' }, titleOk: true });
-    expect(state.final.details[ctx.ps[0].id][1]).toMatchObject({ answer: null, track: { name: 'TITRE_SECRET_1' } });
+    expect(state.final.details[ctx.ps[1].id][1]).toMatchObject({ answer: null, track: { name: 'TITRE_SECRET_1' } });
     const count = ctx.h.messages.length;
     await ctx.ev({ type: 'game:final' });
     await ctx.ev({ type: 'round:start', position: 1, durationMs: 1000 });
@@ -253,7 +254,7 @@ describe('revue : correction à la volée utilisable', () => {
     await ctx.answer(0, 0, 'T', '');
     await close();
     await ctx.ev({ type: 'correct', position: 0, participantId: ctx.ps[0].id, field: 'title', ok: true });
-    expect(ctx.seats[1].last().scores.map(s => s.score)).toEqual([0, 0]);
+    expect(ctx.seats[1].last().scores.map(s => s.score)).toEqual([0]);
     await ctx.ev({ type: 'reveal', position: 0 });
     expect(ctx.seats[1].last().scores.find(s => s.id === ctx.ps[0].id).score).toBe(1);
   });
@@ -263,5 +264,20 @@ describe('revue : correction à la volée utilisable', () => {
     await ctx.ev({ type: 'game:final' });
     await ctx.ev({ type: 'round:close' });
     expect(ctx.seats[0].last().phase).toBe('final');
+  });
+});
+
+describe('revue : joueurs d\'une partie', () => {
+  it('ne classe que ceux qui ont répondu dans cette partie', async () => {
+    const ctx = await setup();
+    await play(ctx, 0);
+    await ctx.answer(0, 0, 'T', '');
+    await ctx.answer(1, 0, '', '');
+    await close();
+    await ctx.ev({ type: 'game:final' });
+    const final = ctx.seats[0].last();
+    expect(final.scores.map(s => s.name)).toEqual(['Équipe A']);
+    expect(Object.keys(final.final.details)).toEqual([ctx.ps[0].id]);
+    expect(ctx.h.last().participants).toHaveLength(2);
   });
 });

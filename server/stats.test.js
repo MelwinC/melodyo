@@ -4,14 +4,14 @@ import { insertUser } from '../test/factories.js';
 import { settings, track } from '../test/games.js';
 import { createPool } from './db.js';
 import { createGame } from './games.js';
-import { joinAsGuest, joinAsUser, openRoomFor, saveAnswer, setValidation } from './rooms/repo.js';
+import { joinAsGuest, joinAsUser, markRevealed, openRoomFor, saveAnswer, setValidation } from './rooms/repo.js';
 import { getStats } from './stats.js';
 
 const pool = createPool(testDatabaseUrl());
 afterAll(() => pool.end());
 
 // Une partie terminée : answers[participant] = [[titre, artiste, titreOk, artisteOk] par chanson]
-async function finishedGame(hostId, roomId, answers, { status = 'finished', themes = ['80s', '80s', 'pop', 'pop'] } = {}) {
+async function finishedGame(hostId, roomId, answers, { status = 'finished', themes = ['80s', '80s', 'pop', 'pop'], reveal = true } = {}) {
   const tracks = themes.map((themeId, i) => track(i, { themeId }));
   const { id: gameId } = await createGame(pool, hostId, { settings: settings(), tracks, roomId });
   for (const [participantId, rows] of answers) {
@@ -23,6 +23,8 @@ async function finishedGame(hostId, roomId, answers, { status = 'finished', them
     }
   }
   await pool.query('UPDATE games SET status = $2 WHERE id = $1', [gameId, status]);
+  // Classement final atteint : toutes les chansons révélées
+  if (reveal) for (let i = 0; i < themes.length; i++) await markRevealed(pool, gameId, i);
   return gameId;
 }
 
@@ -102,5 +104,30 @@ describe('getStats', () => {
     await setValidation(pool, { gameId, position: 1, participantId: meB.id, field: 'artist', ok: true });
     const stats = await getStats(pool, player.id);
     expect(stats).toMatchObject({ games: 1, wins: 1, bestRank: 1 });
+  });
+
+  it('ignore une partie qui n\'a pas atteint le classement final (correction abandonnée)', async () => {
+    const { host, room, player, me, rival } = await world();
+    await finishedGame(host.id, room.id, new Map([[me.id, [['a', '', null, null]]], [rival.id, [['b', '', null, null]]]]), { reveal: false });
+    expect((await getStats(pool, player.id)).games).toBe(0);
+  });
+
+  it('ne compte comme joueurs que ceux qui ont donné une réponse non vide', async () => {
+    const { host, room, player, me, rival } = await world();
+    await finishedGame(host.id, room.id, new Map([[me.id, [['a', '', true, null]]], [rival.id, [['', '', null, null]]]]));
+    expect(await getStats(pool, player.id)).toMatchObject({ games: 1, wins: 0, losses: 0, bestRank: null });
+    const loner = await insertUser(pool);
+    const blank = await joinAsUser(pool, room.id, loner.id);
+    await finishedGame(host.id, room.id, new Map([[blank.id, [['', '', null, null]]], [me.id, [['a', '', true, null]]]]));
+    expect((await getStats(pool, loner.id)).games).toBe(0);
+  });
+
+  it('classe 1, 1, 3 avec trois joueurs', async () => {
+    const { host, room, player, me, rival } = await world();
+    const { participant: third } = await joinAsGuest(pool, room.id, 'Troisième');
+    await finishedGame(host.id, room.id, new Map([
+      [me.id, [['a', '', false, null]]], [rival.id, [['b', 'c', true, true]]], [third.id, [['d', 'e', true, true]]],
+    ]));
+    expect(await getStats(pool, player.id)).toMatchObject({ wins: 0, losses: 1, bestRank: 3 });
   });
 });
