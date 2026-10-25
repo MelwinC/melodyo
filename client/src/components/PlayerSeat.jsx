@@ -1,9 +1,27 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { getRoomState, sendRoom, subscribeRoom } from '../lib/room.js';
 import Avatar from './Avatar.jsx';
+import Scoreboard from './Scoreboard.jsx';
 import { fmtClock, useCountdown } from './useCountdown.js';
 
 const EMPTY = { title: '', artist: '' };
+const ordinal = rank => (rank === 1 ? '1er' : `${rank}e`);
+
+// Chanson révélée et résultat du participant pour cette chanson (une fois corrigée)
+function Reveal({ song, result }) {
+  return (
+    <div className="reveal">
+      {song.albumImage && <img className="reveal-cover" src={song.albumImage} alt="" />}
+      <p>C&apos;était : {song.name} — {song.artists.join(', ')}</p>
+      {result && (
+        <p className="reveal-result">
+          {result.titleOk !== null && <span>Titre {result.titleOk ? '✓' : '✗'}</span>}
+          {result.artistOk !== null && <span>Artiste {result.artistOk ? '✓' : '✗'}</span>}
+        </p>
+      )}
+    </div>
+  );
+}
 const SEND_DELAY_MS = 400;
 
 // Écran du participant : suit la partie et saisit titre et artiste, envoyés au fil de la frappe
@@ -49,6 +67,11 @@ export default function PlayerSeat({ code, participant, onLeave }) {
 
   // Seul l'état du serveur verrouille : un vieil accusé ne bloque pas une manche rouverte
   const locked = round?.status === 'closed';
+  const phase = state?.phase;
+  const focus = phase === 'correcting' ? state.correction.position : round?.position;
+  const song = state?.revealed?.find(r => r.position === focus);
+  const result = state?.you?.results?.find(r => r.position === focus);
+  const mine = state?.revealed?.length ? state.scores.find(sc => sc.id === participant.id) : null;
   const isSaved = Boolean(saved) && (saved.title || saved.artist) && saved.title === draft.title && saved.artist === draft.artist;
 
   return (
@@ -58,6 +81,7 @@ export default function PlayerSeat({ code, participant, onLeave }) {
         <h1>{code}</h1>
         <span className="seat-name">{participant.name}</span>
       </header>
+      {mine && <p className="seat-score">{mine.score} pts · {ordinal(mine.rank)}</p>}
 
       {live.error === 'forbidden' && <div className="browser-warning">Tu ne fais plus partie de cette room</div>}
       {!live.connected && live.error !== 'forbidden' && <div className="reconnecting">Reconnexion…</div>}
@@ -73,9 +97,13 @@ export default function PlayerSeat({ code, participant, onLeave }) {
         </>
       )}
 
-      {game && !round && <p className="empty-state">La partie commence…</p>}
+      {phase === 'final' && <Scoreboard scores={state.scores} participants={state.participants} details={state.final.details} />}
 
-      {round && (
+      {phase === 'correcting' && <p className="empty-state">Correction en cours — chanson {focus + 1}/{game.total}</p>}
+
+      {phase === 'playing' && !round && <p className="empty-state">La partie commence…</p>}
+
+      {round && phase !== 'final' && (
         <div className="answer-card">
           <div className="answer-head">
             <span>Son {round.position + 1}/{game.total}</span>
@@ -95,6 +123,8 @@ export default function PlayerSeat({ code, participant, onLeave }) {
           {!locked && isSaved && <p className="answer-saved">Enregistré ✓</p>}
         </div>
       )}
+
+      {song && phase !== 'final' && <Reveal song={song} result={result} />}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { sendRoom } from '../lib/room.js';
 import PlayerSeat from './PlayerSeat.jsx';
 
 const store = vi.hoisted(() => ({ snapshot: null, listeners: new Set() }));
+vi.mock('./Scoreboard.jsx', () => ({ default: ({ scores, details }) => <p>classement final {scores.length} {Object.keys(details).length}</p> }));
 vi.mock('../lib/room.js', () => ({
   sendRoom: vi.fn(),
   getRoomState: () => store.snapshot,
@@ -58,7 +59,7 @@ describe('PlayerSeat', () => {
   });
 
   it('annonce le début de la partie', () => {
-    store.snapshot = live({ game });
+    store.snapshot = live({ game, phase: 'playing' });
     seat();
     expect(screen.getByText('La partie commence…')).toBeInTheDocument();
   });
@@ -161,5 +162,70 @@ describe('PlayerSeat', () => {
     unmount();
     act(() => vi.advanceTimersByTime(1000));
     expect(sendRoom).not.toHaveBeenCalled();
+  });
+
+  describe('révélation et scores', () => {
+    const song = { position: 3, name: 'Take On Me', artists: ['a-ha'], albumImage: 'https://i.scdn.co/c' };
+    const scores = [{ id: 'p2', name: 'Les Bleus', score: 4, rank: 1 }, { id: 'p1', name: 'Les Rouges', score: 2, rank: 2 }];
+
+    it('montre la chanson révélée, son résultat et son score', () => {
+      store.snapshot = live({
+        game, phase: 'playing', round: open({ status: 'closed', remainingMs: 0 }), revealed: [song], scores,
+        you: { id: 'p1', answer: { title: 'Take on me', artist: 'Toto' }, results: [{ position: 3, titleOk: true, artistOk: false }] },
+      });
+      seat();
+      expect(screen.getByText('C\'était : Take On Me — a-ha')).toBeInTheDocument();
+      expect(screen.getByText('Titre ✓')).toBeInTheDocument();
+      expect(screen.getByText('Artiste ✗')).toBeInTheDocument();
+      expect(screen.getByText('2 pts · 2e')).toBeInTheDocument();
+      expect(document.querySelector('.reveal-cover')).toHaveAttribute('src', 'https://i.scdn.co/c');
+    });
+
+    it('n\'affiche pas de résultat avant la correction ni de score avant la première révélation', () => {
+      store.snapshot = live({ game, phase: 'playing', round: open(), revealed: [], scores });
+      seat();
+      expect(screen.queryByText(/pts/)).toBeNull();
+      setLive(live({ game, phase: 'playing', round: open({ status: 'closed' }), revealed: [{ ...song, albumImage: null }], scores: [{ id: 'p1', name: 'Les Rouges', score: 0, rank: 1 }], you: { id: 'p1', answer: null, results: [] } }));
+      expect(screen.getByText('C\'était : Take On Me — a-ha')).toBeInTheDocument();
+      expect(screen.queryByText(/Titre [✓✗]/)).toBeNull();
+      expect(screen.getByText('0 pts · 1er')).toBeInTheDocument();
+      expect(document.querySelector('.reveal-cover')).toBeNull();
+    });
+
+    it('suit la correction à la fin', () => {
+      store.snapshot = live({
+        game, phase: 'correcting', round: null, correction: { position: 3 }, revealed: [song], scores,
+        you: { id: 'p1', answer: null, results: [{ position: 3, titleOk: null, artistOk: true }] },
+      });
+      seat();
+      expect(screen.getByText('Correction en cours — chanson 4/20')).toBeInTheDocument();
+      expect(screen.getByText('C\'était : Take On Me — a-ha')).toBeInTheDocument();
+      expect(screen.getByText('Artiste ✓')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Titre')).toBeNull();
+    });
+
+    it('n\'affiche que les champs déjà corrigés', () => {
+      store.snapshot = live({
+        game, phase: 'correcting', round: null, correction: { position: 3 }, revealed: [song], scores,
+        you: { id: 'p1', answer: null, results: [{ position: 3, titleOk: false, artistOk: null }] },
+      });
+      seat();
+      expect(screen.getByText('Titre ✗')).toBeInTheDocument();
+      expect(screen.queryByText(/Artiste [✓✗]/)).toBeNull();
+    });
+
+    it('attend la révélation pendant la correction', () => {
+      store.snapshot = live({ game, phase: 'correcting', round: null, correction: { position: 0 }, revealed: [], scores });
+      seat();
+      expect(screen.getByText('Correction en cours — chanson 1/20')).toBeInTheDocument();
+      expect(screen.queryByText(/C'était/)).toBeNull();
+    });
+
+    it('affiche le classement final', () => {
+      store.snapshot = live({ game, phase: 'final', round: open({ status: 'closed' }), revealed: [song], scores, final: { details: { p1: [], p2: [] } } });
+      seat();
+      expect(screen.getByText('classement final 2 2')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Titre')).toBeNull();
+    });
   });
 });
