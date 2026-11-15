@@ -131,9 +131,11 @@ export default function Create({ user, onStart, onProfile, onHistory, onReview, 
               <label key={t.id} className={`theme-card${selected.includes(t.id) ? ' selected' : ''}`}>
                 <input type="checkbox" checked={selected.includes(t.id)} onChange={() => toggleTheme(t)} />
                 <ThemeIcon id={t.id} size={44} />
-                <span className="theme-label">{t.label}</span>
+                <span className="theme-text">
+                  <span className="theme-label">{t.label}</span>
+                  <span className="theme-count">{countLabel(counts[t.id])}</span>
+                </span>
                 <span className="theme-check" aria-hidden="true"><Icon name="check" size={12} /></span>
-                <span className="theme-count">{countLabel(counts[t.id])}</span>
               </label>
             ))}
           </div>
