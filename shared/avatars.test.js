@@ -5,7 +5,7 @@ describe('avatars proposés', () => {
   it('propose 12 avatars distincts', () => {
     expect(AVATAR_PRESETS).toHaveLength(12);
     expect(new Set(AVATAR_PRESETS.map(a => a.id)).size).toBe(12);
-    expect(AVATAR_PRESETS[0]).toEqual({ id: 'note', emoji: '🎵', color: '#1db954' });
+    expect(AVATAR_PRESETS[0]).toEqual({ id: 'note', emoji: '🎵', color: '#cfc2fa' });
   });
 
   it('reconnaît un avatar proposé', () => {

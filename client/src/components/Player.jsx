@@ -1,10 +1,11 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { findTheme } from '../lib/themes.js';
 import { sendRoom } from '../lib/room.js';
 import { toTrackInput } from '../lib/tracks.js';
 import Correction from './Correction.jsx';
 import { useReview } from './useReview.js';
 import { fmtClock, useCountdown } from './useCountdown.js';
+import Icon from './Icon.jsx';
+import ThemeIcon from './ThemeIcon.jsx';
 import {
   getPlayerSnapshot, subscribePlayer, pollPosition,
   togglePlay, nextTrack, previousTrack, seek, seekBy,
@@ -65,16 +66,15 @@ export default function Player({ title, status, loadingText, error, onExit, onBa
 
   const track = snap.sdkTrack;
   const cover = track?.album?.images?.[0]?.url;
-  const theme = snap.theme && findTheme(snap.theme.id);
   const current = tracks?.[snap.index] && toTrackInput(tracks[snap.index]);
   const inReview = current && review.has(current.uri);
 
   return (
     <div className="screen player-screen">
       <header>
-        <button className="btn-back" onClick={onExit}>← Quitter</button>
+        <button className="btn-back" onClick={onExit}><Icon name="back" size={16} /> Quitter</button>
         <h1>{title}</h1>
-        <span style={{ width: 60 }}></span>
+        <span className="header-spacer"></span>
       </header>
 
       {status === 'loading' && (
@@ -86,8 +86,8 @@ export default function Player({ title, status, loadingText, error, onExit, onBa
 
       {status === 'error' && (
         <div className="player-loading">
-          <div style={{ color: 'var(--danger)' }}>{error}</div>
-          <button className="btn btn-ghost" style={{ marginTop: 16 }} onClick={onBack}>← Retour</button>
+          <div className="form-error">{error}</div>
+          <button className="btn btn-ghost player-error-back" onClick={onBack}><Icon name="back" size={15} /> Retour</button>
         </div>
       )}
 
@@ -105,8 +105,8 @@ export default function Player({ title, status, loadingText, error, onExit, onBa
           {snap.remaining != null && <div className="extract-timer">{fmtCountdown(snap.remaining)}</div>}
           {round && participants.length > 0 && (
             <div className="round-status">
-              <span>{room.state.answered.length}/{participants.length} ont répondu</span>
-              <span>{round.status === 'open' ? `⏱ ${fmtClock(answerMs)}` : 'Réponses verrouillées'}</span>
+              <span className="pill">{room.state.answered.length}/{participants.length} ont répondu</span>
+              <span className="pill">{round.status === 'open' ? fmtClock(answerMs) : 'Réponses verrouillées'}</span>
             </div>
           )}
 
@@ -117,9 +117,9 @@ export default function Player({ title, status, loadingText, error, onExit, onBa
 
           <div className="player-controls">
             <button className="ctrl-btn seek-btn" onClick={() => seekBy(-10000)}>-10s</button>
-            <button className="ctrl-btn" onClick={() => skip(previousTrack)}>⏮</button>
-            <button className="ctrl-btn play" onClick={togglePlay}>{snap.paused ? '▶' : '⏸'}</button>
-            <button className="ctrl-btn" onClick={() => skip(nextTrack)}>⏭</button>
+            <button className="ctrl-btn" onClick={() => skip(previousTrack)} aria-label="Précédent"><Icon name="prev" size={20} /></button>
+            <button className="ctrl-btn play" onClick={togglePlay} aria-label={snap.paused ? 'Lecture' : 'Pause'}><Icon name={snap.paused ? 'play' : 'pause'} size={26} /></button>
+            <button className="ctrl-btn" onClick={() => skip(nextTrack)} aria-label="Suivant"><Icon name="next" size={20} /></button>
             <button className="ctrl-btn seek-btn" onClick={() => seekBy(10000)}>+10s</button>
           </div>
 
@@ -134,27 +134,27 @@ export default function Player({ title, status, loadingText, error, onExit, onBa
 
           <div className="hint-row">
             {hintShown && snap.theme
-              ? <div className="hint-text">{theme?.emoji || '💡'} {snap.theme.label}</div>
-              : <button className="btn-hint" onClick={() => setHintShown(true)}>💡 Indice : thème</button>}
+              ? <div className="hint-text"><ThemeIcon id={snap.theme.id} size={26} /> {snap.theme.label}</div>
+              : <button className="btn-hint" onClick={() => setHintShown(true)}><Icon name="bulb" size={15} /> Indice : thème</button>}
           </div>
 
-          {!revealed && <button className="btn-reveal" onClick={() => revealPosition(snap.index)}>👁 Révéler</button>}
+          {!revealed && <button className="btn-reveal" onClick={() => revealPosition(snap.index)}><Icon name="eye" size={18} /> Révéler</button>}
           {roomGame?.correction === 'live' && correction && (
             <Correction state={room.state} onReveal={revealPosition}
               onCorrect={(participantId, field, ok) => sendRoom({ type: 'correct', position: correction.position, participantId, field, ok })} />
           )}
           {round?.status === 'open' && participants.length > 0 && (
-            <button className="btn btn-ghost" onClick={() => sendRoom({ type: 'round:close' })}>🔒 Verrouiller les réponses</button>
+            <button className="btn btn-ghost" onClick={() => sendRoom({ type: 'round:close' })}><Icon name="lock" size={15} /> Verrouiller les réponses</button>
           )}
           {/* Fin de partie (sans retour possible) : proposée seulement sur la dernière chanson */}
           {roomGame && room.state.phase === 'playing' && snap.index === snap.total - 1 && (
             roomGame.correction === 'end'
-              ? <button className="btn btn-ghost" onClick={() => sendRoom({ type: 'correction:start' })}>✅ Corriger les réponses</button>
-              : <button className="btn btn-ghost" onClick={() => sendRoom({ type: 'game:final' })}>🏆 Classement</button>
+              ? <button className="btn btn-ghost" onClick={() => sendRoom({ type: 'correction:start' })}><Icon name="checkCircle" size={15} /> Corriger les réponses</button>
+              : <button className="btn btn-ghost" onClick={() => sendRoom({ type: 'game:final' })}><Icon name="trophy" size={15} /> Classement</button>
           )}
           {revealed && current && (
             <button className="btn-hint btn-review" aria-pressed={inReview} onClick={() => review.toggle(current)}>
-              {inReview ? '✓ À revoir' : '⭐ À revoir'}
+              <Icon name={inReview ? 'check' : 'star'} size={15} /> À revoir
             </button>
           )}
         </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { login, messageFor, register } from '../lib/session.js';
+import Icon, { Logo } from './Icon.jsx';
 
 export default function Auth({ onJoin }) {
   const [mode, setMode] = useState('login');
@@ -29,8 +30,9 @@ export default function Auth({ onJoin }) {
   return (
     <div className="screen screen-login">
       <div className="login-card">
-        <div className="login-icon">🎵</div>
+        <Logo size={72} />
         <h1>Melodyo</h1>
+        <p className="login-tagline">Devine le titre avant tes amis.</p>
         <div className="tabs" role="tablist">
           <button type="button" role="tab" aria-selected={!creating} onClick={() => switchTo('login')}>Connexion</button>
           <button type="button" role="tab" aria-selected={creating} onClick={() => switchTo('register')}>Créer un compte</button>
@@ -49,7 +51,7 @@ export default function Auth({ onJoin }) {
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="btn btn-green btn-full" disabled={busy}>{creating ? 'Créer mon compte' : 'Se connecter'}</button>
         </form>
-        <button type="button" className="btn btn-ghost btn-full link-logout" onClick={onJoin}>🎮 Rejoindre une partie</button>
+        <button type="button" className="btn btn-ghost btn-full link-logout" onClick={onJoin}><Icon name="gamepad" /> Rejoindre une partie</button>
       </div>
     </div>
   );

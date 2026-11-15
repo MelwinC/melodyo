@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { fetchStats } from '../lib/stats.js';
 import { findTheme } from '../lib/themes.js';
+import ThemeIcon from './ThemeIcon.jsx';
 
 const pct = value => `${value} %`;
 const ordinal = rank => (rank === 1 ? '1er' : `${rank}e`);
 const themeName = id => {
   const theme = findTheme(id);
-  return theme ? `${theme.emoji} ${theme.label}` : id;
+  return theme ? <span className="stat-theme"><ThemeIcon id={id} size={22} />{theme.label}</span> : id;
 };
 
 export default function Stats() {

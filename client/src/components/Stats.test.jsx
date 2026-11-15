@@ -30,7 +30,7 @@ describe('Stats', () => {
     expect(tile('Classement moyen')).toHaveTextContent('1,8');
     expect(tile('Meilleur classement')).toHaveTextContent('1er');
     const rows = within(screen.getByRole('table')).getAllByRole('row');
-    expect(rows[1]).toHaveTextContent('📻 Années 80');
+    expect(rows[1]).toHaveTextContent('Années 80');
     expect(rows[1]).toHaveTextContent('40');
     expect(rows[1]).toHaveTextContent('75 %');
     expect(rows[1]).toHaveTextContent('53 %');

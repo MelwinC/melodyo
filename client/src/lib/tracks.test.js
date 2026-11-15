@@ -178,7 +178,7 @@ describe('buildTracks — cas limites', () => {
     const tracks = await buildTracks(['inexistant', theme.id], 3, onProgress);
     expect(tracks).toEqual([]);
     expect(getToast().msg).toMatch(new RegExp(`${theme.label}.*vide ou inaccessible`));
-    expect(onProgress).toHaveBeenCalledWith(`🎵 Chargement : ${theme.label}…`, 40);
+    expect(onProgress).toHaveBeenCalledWith(`Chargement : ${theme.label}…`, 40);
   });
 });
 

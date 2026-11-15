@@ -45,7 +45,7 @@ describe('GameDetail', () => {
     const onBack = vi.fn();
     render(<GameDetail gameId="g1" onBack={onBack} />);
     expect(await screen.findByText('Partie introuvable')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: '← Retour' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Retour' }));
     expect(onBack).toHaveBeenCalled();
   });
 });

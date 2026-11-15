@@ -7,7 +7,7 @@ describe('Avatar', () => {
     const { container } = render(<Avatar avatar={{ kind: 'preset', value: 'guitare' }} size={64} />);
     const el = container.firstChild;
     expect(el).toHaveTextContent('🎸');
-    expect(el).toHaveStyle({ width: '64px', height: '64px', background: '#e67e22' });
+    expect(el).toHaveStyle({ width: '64px', height: '64px', background: '#ffd3b8' });
   });
 
   it('retombe sur la note pour un avatar inconnu', () => {

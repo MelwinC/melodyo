@@ -39,7 +39,7 @@ describe('ReviewList', () => {
     const onBack = vi.fn();
     render(<ReviewList onBack={onBack} />);
     expect(await screen.findByText('Impossible de charger la liste')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: '← Retour' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Retour' }));
     expect(onBack).toHaveBeenCalled();
   });
 });

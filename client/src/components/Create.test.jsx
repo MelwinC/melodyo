@@ -78,7 +78,7 @@ describe('Create', () => {
     await userEvent.click(card('Disney FR'));
     await waitFor(() => expect(card('Disney FR')).toHaveTextContent('indispo'));
     expect(card('Disney FR')).not.toHaveClass('selected');
-    expect(toast).toHaveBeenCalledWith('⚠️ Disney FR : vide');
+    expect(toast).toHaveBeenCalledWith('Disney FR : vide');
   });
 
   it('limite le curseur au thème le plus petit, avec Min et Max', async () => {
@@ -88,7 +88,7 @@ describe('Create', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Max' }));
     expect(slider()).toHaveValue('50');
     await userEvent.click(card('Disney FR'));
-    expect(badgeOf('Sons par thème')).toHaveTextContent('max 23 (🏰 Disney FR)');
+    expect(badgeOf('Sons par thème')).toHaveTextContent('max 23 (Disney FR)');
     expect(slider()).toHaveValue('23');
     expect(screen.getByText('— 46 sons au total')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Min' }));
@@ -102,7 +102,7 @@ describe('Create', () => {
     getThemePools.mockReturnValue({ '80s': pool(120), pop: pool(80) });
     let finish;
     buildTracks.mockImplementation((ids, perTheme, onProgress) => {
-      onProgress('📻 Chargement : Années 80…', 40);
+      onProgress('Chargement : Années 80…', 40);
       return new Promise(r => { finish = r; });
     });
     const onStart = vi.fn();
@@ -112,10 +112,10 @@ describe('Create', () => {
     await userEvent.click(launch());
     expect(activate).toHaveBeenCalled();
     expect(buildTracks).toHaveBeenCalledWith(['80s', 'pop'], 5, expect.any(Function), { excluded: new Set(), review: [] });
-    expect(screen.getByText('📻 Chargement : Années 80…')).toBeInTheDocument();
+    expect(screen.getByText('Chargement : Années 80…')).toBeInTheDocument();
     expect(launch()).toBeDisabled();
     await act(async () => finish(pool(10)));
-    expect(onStart).toHaveBeenCalledWith(pool(10), '📻 🎵', { gameId: 'g1', timer: 'full', start: 'start', reviewUris: new Set() });
+    expect(onStart).toHaveBeenCalledWith(pool(10), 'Années 80, Pop', { gameId: 'g1', timer: 'full', start: 'start', reviewUris: new Set() });
     expect(screen.getByText('Lancement…')).toBeInTheDocument();
   });
 
@@ -222,8 +222,8 @@ describe('Create', () => {
     const onHistory = vi.fn();
     const onReview = vi.fn();
     render(<Create user={user} onProfile={vi.fn()} onStart={vi.fn()} onHistory={onHistory} onReview={onReview} />);
-    await userEvent.click(screen.getByRole('button', { name: '📜 Historique' }));
-    await userEvent.click(screen.getByRole('button', { name: '⭐ À revoir' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Historique' }));
+    await userEvent.click(screen.getByRole('button', { name: 'À revoir' }));
     expect(onHistory).toHaveBeenCalled();
     expect(onReview).toHaveBeenCalled();
   });
@@ -231,7 +231,7 @@ describe('Create', () => {
   it('propose de rejoindre une partie', async () => {
     const onJoin = vi.fn();
     render(<Create user={user} onProfile={vi.fn()} onStart={vi.fn()} onJoin={onJoin} />);
-    await userEvent.click(screen.getByRole('button', { name: '🎮 Rejoindre' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Rejoindre' }));
     expect(onJoin).toHaveBeenCalled();
   });
 

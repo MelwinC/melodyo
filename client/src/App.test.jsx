@@ -306,7 +306,7 @@ describe('App', () => {
       const { unmount } = render(<App />);
       expect(screen.getByText('correction 3')).toBeInTheDocument();
       expect(sendRoom).not.toHaveBeenCalledWith({ type: 'game:end' });
-      await userEvent.click(screen.getByRole('button', { name: '← Retour' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Retour' }));
       expect(endGame).toHaveBeenCalledWith('g7');
       unmount();
       host.value = { ...host.value, live: { connected: true, state: { participants: [], game: { id: 'g7' }, phase: 'final', scores: [], final: { details: {} } } } };
@@ -316,7 +316,7 @@ describe('App', () => {
 
     it('quitte la correction en terminant la partie', async () => {
       await playing({ phase: 'correcting', correction: { position: 0 } });
-      await userEvent.click(screen.getByRole('button', { name: '← Retour' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Retour' }));
       expect(sendRoom).toHaveBeenCalledWith({ type: 'game:end' });
       expect(endGame).toHaveBeenCalledWith('g1');
     });

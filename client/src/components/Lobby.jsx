@@ -1,6 +1,7 @@
 import { toast } from '../lib/toast.js';
 import Avatar from './Avatar.jsx';
 import QrCode from './QrCode.jsx';
+import Icon from './Icon.jsx';
 
 export default function Lobby({ room, state, onClose }) {
   const link = `${location.origin}/r/${room.code}`;
@@ -23,8 +24,8 @@ export default function Lobby({ room, state, onClose }) {
           <div className="lobby-label">Code de la room</div>
           <div className="lobby-code">{room.code}</div>
           <div className="lobby-actions">
-            <button type="button" className="btn btn-ghost btn-sm" onClick={copy}>Copier le lien</button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>Fermer la room</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={copy}><Icon name="copy" size={14} /> Copier le lien</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}><Icon name="close" size={14} /> Fermer la room</button>
           </div>
         </div>
       </div>

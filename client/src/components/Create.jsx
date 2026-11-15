@@ -7,6 +7,8 @@ import { logout } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 import Avatar from './Avatar.jsx';
 import Lobby from './Lobby.jsx';
+import Icon, { Logo } from './Icon.jsx';
+import ThemeIcon from './ThemeIcon.jsx';
 
 // Nombre de sons d'un thème : un nombre, 'loading' ou 'error'
 function countLabel(count) {
@@ -63,7 +65,7 @@ export default function Create({ user, onStart, onProfile, onHistory, onReview, 
     loadThemePool(theme)
       .then(pool => setPools(p => ({ ...p, [theme.id]: pool })))
       .catch(e => {
-        toast(`⚠️ ${theme.label} : ${e.message}`);
+        toast(`${theme.label} : ${e.message}`);
         setPools(p => ({ ...p, [theme.id]: 'error' }));
         setSelected(s => s.filter(id => id !== theme.id));
       });
@@ -79,7 +81,7 @@ export default function Create({ user, onStart, onProfile, onHistory, onReview, 
   const value = Math.max(min, Math.min(perTheme, max));
 
   const maxInfo = pending ? 'calcul des sons…'
-    : limitedBy ? `max ${max} (${limitedBy.emoji} ${limitedBy.label})` : `max ${max}`;
+    : limitedBy ? `max ${max} (${limitedBy.label})` : `max ${max}`;
 
   async function doCreate() {
     activate();
@@ -89,7 +91,7 @@ export default function Create({ user, onStart, onProfile, onHistory, onReview, 
       if (!tracks.length) throw new Error('Aucun son trouvé pour ces thèmes.');
       setProgress({ label: 'Lancement…', pct: 95 });
       const gameId = await createGame({ themes: selected, perTheme: value, timer, start, correction }, tracks.map(toTrackInput), room?.id);
-      onStart(tracks, selected.map(id => findTheme(id).emoji).join(' '), {
+      onStart(tracks, selected.map(id => findTheme(id).label).join(', '), {
         gameId, timer, start, reviewUris: new Set(context.review.map(r => r.uri)),
       });
     } catch (e) {
@@ -105,18 +107,18 @@ export default function Create({ user, onStart, onProfile, onHistory, onReview, 
           <Avatar avatar={user.avatar} size={28} />
           <span>{user.username}</span>
         </button>
-        <h1>🎵 Melodyo</h1>
-        <button className="btn btn-ghost btn-sm" onClick={() => { disconnect(); logout(); }}>Déco.</button>
+        <h1 className="brand"><Logo size={30} /> Melodyo</h1>
+        <button className="btn btn-ghost btn-sm" onClick={() => { disconnect(); logout(); }}><Icon name="logout" size={15} /> Déco.</button>
       </header>
       {room && <Lobby room={room} state={roomState} onClose={onCloseRoom} />}
       <div className="home-links">
-        <button className="btn btn-ghost btn-sm" onClick={onHistory}>📜 Historique</button>
-        <button className="btn btn-ghost btn-sm" onClick={onReview}>⭐ À revoir</button>
-        <button className="btn btn-ghost btn-sm" onClick={onJoin}>🎮 Rejoindre</button>
+        <button className="btn btn-ghost btn-sm" onClick={onHistory}><Icon name="history" size={15} /> Historique</button>
+        <button className="btn btn-ghost btn-sm" onClick={onReview}><Icon name="star" size={15} /> À revoir</button>
+        <button className="btn btn-ghost btn-sm" onClick={onJoin}><Icon name="gamepad" size={15} /> Rejoindre</button>
       </div>
       {isFirefox && (
         <div className="browser-warning">
-          ⚠️ Firefox ne peut pas lire l'audio Spotify (DRM refusé par Spotify). Utilise Chrome, Edge ou Safari.
+          <Icon name="warn" size={18} /> Firefox ne peut pas lire l'audio Spotify (DRM refusé par Spotify). Utilise Chrome, Edge ou Safari.
         </div>
       )}
       <div className="form">
@@ -128,8 +130,9 @@ export default function Create({ user, onStart, onProfile, onHistory, onReview, 
             {THEMES.map(t => (
               <label key={t.id} className={`theme-card${selected.includes(t.id) ? ' selected' : ''}`}>
                 <input type="checkbox" checked={selected.includes(t.id)} onChange={() => toggleTheme(t)} />
-                <span className="theme-emoji">{t.emoji}</span>
+                <ThemeIcon id={t.id} size={44} />
                 <span className="theme-label">{t.label}</span>
+                <span className="theme-check" aria-hidden="true"><Icon name="check" size={12} /></span>
                 <span className="theme-count">{countLabel(counts[t.id])}</span>
               </label>
             ))}
@@ -152,14 +155,17 @@ export default function Create({ user, onStart, onProfile, onHistory, onReview, 
             </div>
           </div>
         </div>
+        <div className="settings-card">
         <Choice label="Durée" value={timer} onChange={setTimer}
           options={[['full', 'Chanson entière'], ['30s', 'Extrait 30 s']]} />
         <Choice label="Départ" value={start} onChange={setStart}
           options={[['start', 'Début'], ['middle', 'Milieu']]} />
         <Choice label="Correction" value={correction} onChange={setCorrection}
           options={[['live', 'Après chaque chanson'], ['end', 'À la fin']]} />
-        <button className="btn btn-green btn-full" disabled={!selected.length || pending || !!progress} onClick={doCreate}>
-          ▶ Lancer la partie
+        </div>
+        <div className="launch-bar">
+        <button className="btn btn-green btn-full btn-launch" disabled={!selected.length || pending || !!progress} onClick={doCreate}>
+          <Icon name="play" size={18} /> Lancer la partie
         </button>
         {progress && (
           <div className="progress-box show">
@@ -167,6 +173,7 @@ export default function Create({ user, onStart, onProfile, onHistory, onReview, 
             <div className="progress-bar"><div className="progress-fill" style={{ width: `${progress.pct}%` }}></div></div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

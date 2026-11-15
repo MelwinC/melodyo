@@ -1,4 +1,5 @@
 import Avatar from './Avatar.jsx';
+import Icon from './Icon.jsx';
 
 const EMPTY = { title: '', artist: '', titleOk: null, artistOk: null };
 
@@ -34,7 +35,7 @@ export default function Correction({ state, onCorrect, onReveal, onNext }) {
           : (
             <>
               <span className="correction-hidden">Pas encore révélée</span>
-              <button type="button" className="btn btn-green btn-sm" onClick={() => onReveal(position)}>👁 Révéler</button>
+              <button type="button" className="btn btn-green btn-sm" onClick={() => onReveal(position)}><Icon name="eye" size={14} /> Révéler</button>
             </>
           )}
       </div>

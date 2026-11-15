@@ -33,7 +33,7 @@ export default function GameDetail({ gameId, onBack }) {
           <p className="game-settings">{describe(game.settings)}</p>
           <div className="playlist-list">
             {game.tracks.map(t => (
-              <TrackRow key={t.position} track={t} played={t.played} actionLabel="⭐ À revoir"
+              <TrackRow key={t.position} track={t} played={t.played} actionLabel="À revoir"
                 actionPressed={review.has(t.uri)} onAction={() => review.toggle(t)} />
             ))}
           </div>

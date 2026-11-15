@@ -60,7 +60,7 @@ describe('Auth', () => {
   it('propose de rejoindre une partie', async () => {
     const onJoin = vi.fn();
     render(<Auth onJoin={onJoin} />);
-    await userEvent.click(screen.getByRole('button', { name: '🎮 Rejoindre une partie' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Rejoindre une partie' }));
     expect(onJoin).toHaveBeenCalled();
   });
 });

@@ -23,7 +23,7 @@ describe('Profile', () => {
     expect(screen.getByText('statistiques du compte')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'note' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getAllByRole('button', { pressed: false })).toHaveLength(11);
-    await userEvent.click(screen.getByRole('button', { name: '← Retour' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Retour' }));
     expect(onBack).toHaveBeenCalled();
   });
 

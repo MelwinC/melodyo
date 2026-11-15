@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { listGames } from '../lib/games.js';
+import ThemeIcon from './ThemeIcon.jsx';
 import { findTheme } from '../lib/themes.js';
 import Screen from './Screen.jsx';
 
@@ -23,7 +24,10 @@ export default function History({ onOpen, onBack }) {
         {games?.map(g => (
           <button key={g.id} type="button" className="playlist-item game-item" onClick={() => onOpen(g.id)}>
             <div className="playlist-item-info">
-              <div className="playlist-item-name">{g.settings.themes.map(id => findTheme(id).emoji).join(' ')}</div>
+              <div className="playlist-item-name game-themes">
+                <span className="theme-stack" aria-hidden="true">{g.settings.themes.slice(0, 4).map(id => <ThemeIcon key={id} id={id} size={26} />)}</span>
+                <span>{g.settings.themes.map(id => findTheme(id).label).join(', ')}</span>
+              </div>
               <div className="playlist-item-meta">{formatDate(g.createdAt)} · {g.playedCount}/{g.trackCount} sons</div>
             </div>
             <span className={`badge status-${g.status}`}>{STATUS[g.status]}</span>

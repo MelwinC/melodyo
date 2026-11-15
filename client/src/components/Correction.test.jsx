@@ -43,7 +43,7 @@ describe('Correction', () => {
     const p = props();
     const { rerender } = render(<Correction {...p} />);
     expect(screen.getByText('Pas encore révélée')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: '👁 Révéler' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Révéler' }));
     expect(p.onReveal).toHaveBeenCalledWith(1);
     rerender(<Correction {...p} state={state({ revealed: [{ position: 1, name: 'Take On Me', artists: ['a-ha', 'X'], albumImage: 'https://i.scdn.co/c' }] })} />);
     expect(screen.getByText('Take On Me — a-ha, X')).toBeInTheDocument();

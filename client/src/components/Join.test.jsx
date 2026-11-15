@@ -73,7 +73,7 @@ describe('Join', () => {
   it('revient à l\'accueil', async () => {
     const onLeave = vi.fn();
     render(<Join code="" user={null} onLeave={onLeave} />);
-    await userEvent.click(screen.getByRole('button', { name: '← Retour' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Retour' }));
     expect(onLeave).toHaveBeenCalled();
     expect(disconnectRoom).not.toHaveBeenCalled();
   });

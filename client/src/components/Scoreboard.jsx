@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Avatar from './Avatar.jsx';
+import Icon from './Icon.jsx';
 
 const DEFAULT_AVATAR = { kind: 'preset', value: 'note' };
 
@@ -31,7 +32,7 @@ export default function Scoreboard({ scores, participants, details, onClose }) {
 
   return (
     <section className="scoreboard">
-      <h2>🏆 Classement</h2>
+      <h2 className="with-icon"><Icon name="trophy" size={20} /> Classement</h2>
       {scores.length === 0 && <p className="lobby-empty">Personne n&apos;a joué</p>}
       <ol className="score-list">
         {scores.map(s => (

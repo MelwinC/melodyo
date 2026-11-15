@@ -3,6 +3,7 @@ import { choosePreset, messageFor, uploadAvatar } from '../lib/session.js';
 import { toast } from '../lib/toast.js';
 import Avatar from './Avatar.jsx';
 import Stats from './Stats.jsx';
+import Icon from './Icon.jsx';
 
 async function attempt(action) {
   try {
@@ -23,9 +24,9 @@ export default function Profile({ user, onBack }) {
   return (
     <div className="screen">
       <header>
-        <button className="btn-back" onClick={onBack}>← Retour</button>
+        <button className="btn-back" onClick={onBack}><Icon name="back" size={16} /> Retour</button>
         <h1>Mon profil</h1>
-        <span style={{ width: 60 }}></span>
+        <span className="header-spacer"></span>
       </header>
       <div className="profile">
         <Avatar avatar={user.avatar} size={96} />

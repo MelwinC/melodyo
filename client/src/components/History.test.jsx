@@ -16,7 +16,7 @@ describe('History', () => {
     expect(screen.getByText('Chargement…')).toBeInTheDocument();
     const rows = await screen.findAllByRole('button', { name: /sons/ });
     expect(rows).toHaveLength(3);
-    expect(rows[0]).toHaveTextContent('📻 🏰');
+    expect(rows[0]).toHaveTextContent('Années 80, Disney FR');
     expect(rows[0]).toHaveTextContent('8/10 sons');
     expect(rows[0]).toHaveTextContent('Terminée');
     expect(rows[0]).toHaveTextContent('24 oct. 2026');
@@ -37,7 +37,7 @@ describe('History', () => {
     const onBack = vi.fn();
     render(<History onOpen={vi.fn()} onBack={onBack} />);
     expect(await screen.findByText('Impossible de charger l\'historique')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: '← Retour' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Retour' }));
     expect(onBack).toHaveBeenCalled();
   });
 });

@@ -135,7 +135,7 @@ export async function buildTracks(themeIds, perTheme, onProgress, { excluded = n
   for (let i = 0; i < themeIds.length; i++) {
     const theme = findTheme(themeIds[i]);
     if (!theme) { console.warn(`[build] thème inconnu : ${themeIds[i]}`); continue; }
-    onProgress(`${theme.emoji} Chargement : ${theme.label}…`, Math.round((i / themeIds.length) * 80));
+    onProgress(`Chargement : ${theme.label}…`, Math.round((i / themeIds.length) * 80));
     try {
       const pool = await loadThemePool(theme);
       // Sons « à revoir » d'abord (au plus la moitié du quota), puis des sons neufs

@@ -26,14 +26,14 @@ describe('LinkSpotify', () => {
   it('propose de rejoindre une partie', async () => {
     const onJoin = vi.fn();
     render(<LinkSpotify user={user} onJoin={onJoin} />);
-    await userEvent.click(screen.getByRole('button', { name: '🎮 Rejoindre une partie' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Rejoindre une partie' }));
     expect(onJoin).toHaveBeenCalled();
   });
 
   it('ouvre le profil', async () => {
     const onProfile = vi.fn();
     render(<LinkSpotify user={user} onProfile={onProfile} />);
-    await userEvent.click(screen.getByRole('button', { name: '👤 Mon profil et mes stats' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Mon profil et mes stats' }));
     expect(onProfile).toHaveBeenCalled();
   });
 });

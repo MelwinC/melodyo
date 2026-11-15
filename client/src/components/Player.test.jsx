@@ -48,14 +48,14 @@ describe('Player', () => {
     const onBack = vi.fn();
     render(<Player title="T" status="error" error="Spotify Premium requis" onBack={onBack} />);
     expect(screen.getByText('Spotify Premium requis')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: '← Retour' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Retour' }));
     expect(onBack).toHaveBeenCalled();
   });
 
   it('quitte la partie', async () => {
     const onExit = vi.fn();
     ready({ onExit });
-    await userEvent.click(screen.getByRole('button', { name: '← Quitter' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Quitter' }));
     expect(onExit).toHaveBeenCalled();
   });
 
@@ -86,14 +86,14 @@ describe('Player', () => {
   it('montre le thème en indice', async () => {
     ready();
     await userEvent.click(screen.getByRole('button', { name: /Indice/ }));
-    expect(screen.getByText('📻 Années 80')).toBeInTheDocument();
+    expect(screen.getByText('Années 80')).toBeInTheDocument();
   });
 
   it('utilise une ampoule pour un thème inconnu', async () => {
     store.snapshot.theme = { id: 'inconnu', label: 'Autre' };
     ready();
     await userEvent.click(screen.getByRole('button', { name: /Indice/ }));
-    expect(screen.getByText('💡 Autre')).toBeInTheDocument();
+    expect(screen.getByText('Autre')).toBeInTheDocument();
   });
 
   it('garde le bouton d\'indice sans thème connu', async () => {
@@ -105,17 +105,17 @@ describe('Player', () => {
 
   it('pilote la lecture', async () => {
     ready();
-    await userEvent.click(screen.getByRole('button', { name: '▶' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Lecture' }));
     await userEvent.click(screen.getByRole('button', { name: '-10s' }));
     await userEvent.click(screen.getByRole('button', { name: '+10s' }));
     expect(togglePlay).toHaveBeenCalled();
     expect(seekBy).toHaveBeenCalledWith(-10000);
     expect(seekBy).toHaveBeenCalledWith(10000);
     setSnapshot({ paused: false });
-    expect(screen.getByRole('button', { name: '⏸' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
   });
 
-  it.each([['⏭', nextTrack], ['⏮', previousTrack]])('%s re-masque la réponse et change de son', async (label, action) => {
+  it.each([['Suivant', nextTrack], ['Précédent', previousTrack]])('%s re-masque la réponse et change de son', async (label, action) => {
     ready();
     await userEvent.click(reveal());
     await userEvent.click(screen.getByRole('button', { name: label }));
@@ -189,11 +189,11 @@ describe('Player', () => {
     ready({ tracks, reviewUris: new Set(['spotify:track:dejà']) });
     expect(screen.queryByRole('button', { name: /À revoir/ })).toBeNull();
     await userEvent.click(reveal());
-    const button = screen.getByRole('button', { name: '⭐ À revoir' });
+    const button = screen.getByRole('button', { name: 'À revoir' });
     expect(button).toHaveAttribute('aria-pressed', 'false');
     await userEvent.click(button);
     expect(addToReview).toHaveBeenCalledWith({ uri: 'q2', name: 'Titre q2', artists: ['A1', 'A2'], albumImage: 'https://i.scdn.co/q2', themeId: '80s' });
-    expect(screen.getByRole('button', { name: '✓ À revoir' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'À revoir' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('affiche le nombre de réponses et le temps restant de la manche', () => {
@@ -201,7 +201,7 @@ describe('Player', () => {
     const room = { state: { round, participants: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], answered: ['a'] }, receivedAt: Date.now() };
     const { rerender } = ready({ room });
     expect(screen.getByText('1/3 ont répondu')).toBeInTheDocument();
-    expect(screen.getByText('⏱ 1:05')).toBeInTheDocument();
+    expect(screen.getByText('1:05')).toBeInTheDocument();
     rerender(<Player title="📻" status="ready" onExit={vi.fn()} onBack={vi.fn()} room={{ ...room, state: { ...room.state, round: { ...round, status: 'closed' } } }} />);
     expect(screen.getByText('Réponses verrouillées')).toBeInTheDocument();
   });
@@ -230,22 +230,22 @@ describe('Player', () => {
       ready({ room: roomOf() });
       await userEvent.click(screen.getByRole('button', { name: 'Titre correct' }));
       expect(sendRoom).toHaveBeenCalledWith({ type: 'correct', position: 2, participantId: 'a', field: 'title', ok: true });
-      await userEvent.click(screen.getAllByRole('button', { name: '👁 Révéler' })[0]);
+      await userEvent.click(screen.getAllByRole('button', { name: 'Révéler' })[0]);
       expect(sendRoom).toHaveBeenCalledWith({ type: 'reveal', position: 2 });
       expect(cover()).not.toHaveClass('blur');
-      expect(screen.queryByRole('button', { name: '🏆 Classement' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Classement' })).toBeNull();
     });
 
     it('propose le classement seulement sur la dernière chanson', async () => {
       store.snapshot = { ...store.snapshot, index: 19, total: 20 };
       ready({ room: roomOf() });
-      await userEvent.click(screen.getByRole('button', { name: '🏆 Classement' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Classement' }));
       expect(sendRoom).toHaveBeenLastCalledWith({ type: 'game:final' });
     });
 
     it('verrouille les réponses de la chanson en cours', async () => {
       ready({ room: roomOf({ correction: null, round: { position: 2, status: 'open', remainingMs: 5000, paused: false } }) });
-      await userEvent.click(screen.getByRole('button', { name: '🔒 Verrouiller les réponses' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Verrouiller les réponses' }));
       expect(sendRoom).toHaveBeenCalledWith({ type: 'round:close' });
     });
 
@@ -258,19 +258,19 @@ describe('Player', () => {
     it('révèle depuis le panneau une chanson qui n\'est plus celle jouée', async () => {
       store.snapshot = { ...store.snapshot, index: 3 };
       ready({ room: roomOf() });
-      await userEvent.click(screen.getAllByRole('button', { name: '👁 Révéler' }).at(-1));
+      await userEvent.click(screen.getAllByRole('button', { name: 'Révéler' }).at(-1));
       expect(sendRoom).toHaveBeenCalledWith({ type: 'reveal', position: 2 });
       expect(cover()).toHaveClass('blur');
     });
 
     it('à la fin : propose de lancer la correction à la dernière chanson', async () => {
       const { unmount } = ready({ room: roomOf({ game: { id: 'g', total: 20, correction: 'end' }, correction: null }) });
-      expect(screen.queryByRole('button', { name: '✅ Corriger les réponses' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Corriger les réponses' })).toBeNull();
       unmount();
       store.snapshot = { ...store.snapshot, index: 19, total: 20 };
       ready({ room: roomOf({ game: { id: 'g', total: 20, correction: 'end' }, correction: null }) });
       expect(screen.queryByRole('button', { name: 'Titre correct' })).toBeNull();
-      await userEvent.click(screen.getByRole('button', { name: '✅ Corriger les réponses' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Corriger les réponses' }));
       expect(sendRoom).toHaveBeenCalledWith({ type: 'correction:start' });
     });
   });
