@@ -102,6 +102,8 @@ async function connectPlayer(onReady, onError) {
   p.addListener('not_ready', ({ device_id }) => console.warn('[player] not_ready, device_id:', device_id));
   p.addListener('playback_error', e => {
     console.error('[player] playback_error:', e.message);
+    // Refus d'autoplay (NotAllowedError) : le SDK réessaie tout seul ; un vrai blocage passe par autoplay_failed
+    if (e.message === 'The operation is not allowed.') return;
     // Erreurs en rafale = le navigateur ne peut pas déchiffrer l'audio (DRM Widevine) :
     // on met en pause au lieu de laisser le SDK sauter toute la playlist
     if (++playbackErrorCount >= 2) {
