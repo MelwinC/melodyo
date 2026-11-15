@@ -132,6 +132,16 @@ describe('erreurs de lecture', () => {
     expect(toast).toHaveBeenLastCalledWith(expect.stringContaining('DRM'));
   });
 
+  it('ignore le refus d\'autoplay du navigateur (le SDK réessaie, autoplay_failed couvre le vrai blocage)', async () => {
+    const p = await readyPlayer();
+    for (let i = 0; i < 3; i++) p.emit('playback_error', { message: 'The operation is not allowed.' });
+    expect(toast).not.toHaveBeenCalled();
+    expect(p.pause).not.toHaveBeenCalled();
+    // ces erreurs ne comptent pas dans la rafale : une vraie erreur reste signalée comme la première
+    p.emit('playback_error', { message: 'Playback error' });
+    expect(toast).toHaveBeenLastCalledWith('⚠️ Lecture impossible : Playback error');
+  });
+
   it('remet le compteur à zéro dès qu\'un son joue', async () => {
     const p = await readyPlayer();
     p.emit('playback_error', { message: 'x' });
