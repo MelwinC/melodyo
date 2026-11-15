@@ -820,12 +820,12 @@ button.playlist-item:hover { border-color: var(--accent); transform: translateY(
 .theme-card, .theme-card:nth-child(n) { background: #fff; border: 1.5px solid var(--line); box-shadow: var(--shadow); grid-template-columns: 44px 1fr; border-radius: 18px; }
 .theme-card:hover { background: #fff; border-color: var(--surface3); }
 .theme-card.selected { background: #faf7ff; border: 2px solid var(--accent-ink); }
-.theme-icon { grid-area: emoji; display: block; border-radius: 12px; }
+.theme-icon { grid-area: emoji; border-radius: 13px; }
 .theme-label { font-size: 14px; }
 .theme-card .theme-count { color: var(--text2); }
 .game-themes { display: flex; align-items: center; gap: 10px; }
 .theme-stack { display: inline-flex; }
-.theme-stack .theme-icon { border: 2px solid #fff; margin-left: -8px; }
+.theme-stack .theme-icon { border: 2px solid #fff; margin-left: -8px; border-radius: 50%; }
 .theme-stack .theme-icon:first-child { margin-left: 0; }
 .stat-theme { display: inline-flex; align-items: center; gap: 8px; }
 .hint-text { display: inline-flex; align-items: center; gap: 8px; }
@@ -844,3 +844,5 @@ button.playlist-item:hover { border-color: var(--accent); transform: translateY(
 /* titre de l'écran lecteur : une ligne propre */
 header h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .login-tagline { color: var(--text2); }
+
+.theme-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }

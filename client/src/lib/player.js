@@ -151,6 +151,12 @@ function trackUris(track) {
   return [track.uri, track.linked_from?.uri].filter(Boolean);
 }
 
+// Départ aléatoire dans la tranche des 20 % du milieu du titre (de 40 % à 60 %)
+export function randomMiddleStart(durationMs) {
+  if (!(durationMs > 0)) return 0;
+  return Math.floor(durationMs * (0.4 + Math.random() * 0.2));
+}
+
 function onPlayerStateChanged(state) {
   if (!state) return;
   if (!state.paused && state.position > 0) playbackErrorCount = 0;
@@ -168,9 +174,7 @@ function onPlayerStateChanged(state) {
     playedMs = 0;
     lastTick = null;
     extractDone = false;
-    const startAt = options.start === 'middle'
-      ? Math.max(0, Math.floor(state.duration / 2) - (options.timer === '30s' ? 15000 : 0))
-      : 0;
+    const startAt = options.start === 'middle' ? randomMiddleStart(state.duration) : 0;
     if (options.start === 'middle') player.seek(startAt);
     // Chaque démarrage (retour arrière compris) rouvre la manche ; seule la première écoute compte comme jouée
     if (idx >= 0) {

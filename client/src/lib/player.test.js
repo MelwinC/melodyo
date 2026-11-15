@@ -326,17 +326,27 @@ describe('options de lecture', () => {
   }
   const playingState = (uri, extra = {}) => ({ paused: false, position: 0, duration: 200000, track_window: { current_track: { uri } }, ...extra });
 
-  it('démarre au milieu de la chanson', async () => {
+  it('démarre dans la tranche des 20 % du milieu de la chanson', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const p = await queued({ start: 'middle' });
     p.emit('player_state_changed', playingState('a'));
     expect(p.seek).toHaveBeenCalledWith(100000);
   });
 
-  it('centre l\'extrait de 30 s au milieu, sans passer sous zéro', async () => {
+  it('borne le départ aléatoire entre 40 % et 60 % de la durée', () => {
+    const random = vi.spyOn(Math, 'random');
+    random.mockReturnValue(0);
+    expect(mod.randomMiddleStart(200000)).toBe(80000);
+    random.mockReturnValue(0.999);
+    expect(mod.randomMiddleStart(200000)).toBeLessThan(120000);
+    expect(mod.randomMiddleStart(200000)).toBeGreaterThanOrEqual(119000);
+  });
+
+  it('démarre à 0 quand la durée est inconnue', async () => {
+    expect(mod.randomMiddleStart(0)).toBe(0);
+    expect(mod.randomMiddleStart(undefined)).toBe(0);
     const p = await queued({ start: 'middle', timer: '30s' });
-    p.emit('player_state_changed', playingState('a'));
-    expect(p.seek).toHaveBeenLastCalledWith(85000);
-    p.emit('player_state_changed', playingState('b', { duration: 20000 }));
+    p.emit('player_state_changed', playingState('b', { duration: 0 }));
     expect(p.seek).toHaveBeenLastCalledWith(0);
   });
 
@@ -349,6 +359,7 @@ describe('options de lecture', () => {
 
   it('signale chaque chanson avec sa durée restante depuis le départ', async () => {
     const onTrackStart = vi.fn();
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const p = await queued({ onTrackStart, start: 'middle' });
     for (const uri of ['a', 'b', 'a', 'zzz']) p.emit('player_state_changed', playingState(uri));
     expect(onTrackStart.mock.calls).toEqual([[0, 100000, true], [1, 100000, true], [0, 100000, false]]);
